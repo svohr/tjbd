@@ -29,17 +29,19 @@ Observed            |        |                        |        |
                     +--------+                        +--------+
 
 f_tj = Frequency of observed historical base in population
-   D = Probability of recombination per gen. (genetic distance in Morgans)
+   D = Probability of recombination per generation (genetic distance in Morgans)
    g = Number of generations between historical and present-day individuals
 
 ```
 
 ## Inputs
-
 1. A bam file containing reads mapped to the reference human genome from
    the low-coverage sequencing of the historical individual.
 2. A VCF file containing genotypes of the present-day descendant.
 3. Population allele frequencies or counts (e.g., 1000 Genomes Project data)
 4. A genetic/recombination map
 
+## Output
+The posterior probablilities of the two individuals sharing at least one
+chromosome segment of IBD and not IBD at each observed position.
 
