@@ -22,13 +22,18 @@ class RecMap(object):
     Attributes:
         scaf_ints: A dictionary storing the interval tree for each chromosome.
     """
-    def __init__(self):
+    def __init__(self, rec_in=None):
         """
         Initialize a new RecMap
+        Args:
+            rec_in: file object for reading in the recombination map.
+        Returns: nothing
         """
         self.scaf_ints = collections.defaultdict(intervaltree.IntervalTree)
+        if rec_in:
+            self.read_tab(rec_in)
 
-    def _read_tab(self, rec_in):
+    def read_tab(self, rec_in):
         """
         Read genetic distances in from a tab delimited file containing
         markers (physical positions) and genetic distances (in centimorgans)
@@ -58,7 +63,9 @@ class RecMap(object):
     def gene_dist(self, chrm, start, end):
         """
         Return an estimate of the genetic distance between physical positions
-        'start' and 'end' on chromosome 'chrm'.
+        'start' and 'end' on chromosome 'chrm'. If a map distance partially
+        overlaps the range, the genetic distance is scaled assuming a
+        uniform recombination rate between the available physical positions.
 
         Args:
             chrm: A chromosome ID
@@ -67,5 +74,16 @@ class RecMap(object):
         returns: a genetic distance in centimorgans
         """
         # super simple version of this.
-        intervals = self.scaf_ints[chrm][start:end]
-        return sum([interval.data for interval in intervals])
+        interval = intervaltree.Interval(start, end)
+        if not interval:
+            return None # query interval not included in the map.
+        total_dist = 0.0
+        for map_interval in self.scaf_ints[chrm][start:end]:
+            if interval.contains_interval(map_interval):
+                total_dist += map_interval.data
+            else:
+                frac = (float(min(interval.end, map_interval.end)
+                              - max(interval.begin, map_interval.begin))
+                        / map_interval.length())
+                total_dist += frac * map_interval.data
+        return total_dist
