@@ -70,6 +70,7 @@ def forward_backward(observations, freqs, ibd_trs, noibd_trs):
 
     # Forward probabilities
     # fill in the first, assume an equal chance of starting in an ibd segment.
+    # TODO: This should probably not be equal.
     fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * 0.5
     fwd_noibd_scaled[0] = prob_obs_noibd(freqs[0], observations[0]) * 0.5
     fwd_scale[0] = fwd_ibd_scaled[0] + fwd_noibd_scaled[0]
@@ -134,6 +135,8 @@ def main():
     n = numpy.array([0.9] * 15)
 
     print forward_backward(o, f, i, n)
+    return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
