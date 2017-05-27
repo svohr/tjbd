@@ -7,20 +7,20 @@ for each position in a chromosome.
 
 """
 
-import itertools
+import sys
 import numpy
 
-import recmap
-import freqs
+#import recmap
+#import freqs
 
 
-def pos_to_idb_prob(recmap, positions):
+def pos_to_idb_prob(rec, positions):
     """
     Takes RecMap object and a list of positions and returns a vector that
     contains the transition probabilities of remaining in the IBD state.
 
     Args:
-        recmap: A RecMap object containing a genetic map.
+        rec: A RecMap object containing a genetic map.
         positions: a numpy vector of base positions
     Returns:
         a numpy vector containing transition probabilities of remaining IBD
@@ -64,37 +64,40 @@ def prob_obs_noibd(freq, obs_match):
 def forward_backward(observations, freqs, ibd_trs, noibd_trs):
     """
     """
-    fwd_ibd_scaled = numpy.empty(len(obs))
-    fwd_noibd_scaled = numpy.empty(len(obs))
-    fwd_scale = numpy.empty(len(obs))
+    fwd_ibd_scaled = numpy.empty(len(observations))
+    fwd_noibd_scaled = numpy.empty(len(observations))
+    fwd_scale = numpy.empty(len(observations))
 
     # Forward probabilities
     # fill in the first, assume an equal chance of starting in an ibd segment.
     fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * 0.5
     fwd_noibd_scaled[0] = prob_obs_noibd(freqs[0], observations[0]) * 0.5
-    # FIX: NOT SCALED
+    fwd_scale[0] = fwd_ibd_scaled[0] + fwd_noibd_scaled[0]
+    fwd_ibd_scaled[0] /= fwd_scale[0]
+    fwd_noibd_scaled[0] /= fwd_scale[0]
+
     for i, obs in enumerate(observations):
         if i == 0:
             continue
         ibd_tmp = ((prob_obs_ibd(freqs[i], obs)
-                    * fwd_ibd[i - 1]
+                    * fwd_ibd_scaled[i - 1]
                     * ibd_trs[i])
                    + (prob_obs_ibd(freqs[i], obs)
-                      * fwd_noibd[i - 1]
+                      * fwd_noibd_scaled[i - 1]
                       * (1 - noibd_trs[i])))
         noibd_tmp = ((prob_obs_noibd(freqs[i], obs)
-                      * fwd_noibd[i - 1]
+                      * fwd_noibd_scaled[i - 1]
                       * noibd_trs[i])
                      + (prob_obs_noibd(freqs[i], obs)
-                        * fwd_ibd[i - 1]
+                        * fwd_ibd_scaled[i - 1]
                         * (1 - ibd_trs[i])))
         fwd_scale[i] = ibd_tmp + noibd_tmp
         fwd_ibd_scaled[i] = ibd_tmp / fwd_scale[i]
         fwd_noibd_scaled[i] = noibd_tmp / fwd_scale[i]
 
     # Backward probabilities
-    bwd_ibd_scaled = numpy.empty(len(obs))
-    bwd_noibd_scaled = numpy.empty(len(obs))
+    bwd_ibd_scaled = numpy.empty(len(observations))
+    bwd_noibd_scaled = numpy.empty(len(observations))
 
     bwd_ibd_scaled[-1] = 1.0
     bwd_noibd_scaled[-1] = 1.0
@@ -106,18 +109,31 @@ def forward_backward(observations, freqs, ibd_trs, noibd_trs):
                                              observations[i + 1])
                               * bwd_ibd_scaled[i + 1])
                              + ((1 - ibd_trs[i + 1])
-                                * pos_obs_noibd(freqs[i + 1],
-                                                observations[i + 1])
+                                * prob_obs_noibd(freqs[i + 1],
+                                                 observations[i + 1])
                                 * bwd_noibd_scaled[i + 1])) / scale
         bwd_noibd_scaled[i] = ((noibd_trs[i + 1]
                                 * prob_obs_noibd(freqs[i + 1],
                                                  observations[i + 1])
                                 * bwd_noibd_scaled[i + 1])
                                + ((1 - noibd_trs[i + 1])
-                                  * pos_obs_ibd(freqs[i + 1],
-                                                observations[i + 1])
+                                  * prob_obs_ibd(freqs[i + 1],
+                                                 observations[i + 1])
                                   * bwd_ibd_scaled[i + 1])) / scale
 
     # posterior decoding:
     return fwd_ibd_scaled * bwd_ibd_scaled
 
+
+def main():
+    o = [False, False, False, True, True, False, True,
+         False, False, False, False, False, True, False, False]
+    f = numpy.array([0.1, 0.1, 0.1, 0.01, 0.01, 0.01, 0.01,
+                     0.1, 0.1, 0.1, 0.1, 0.1, 0.9, 0.1, 0.1])
+    i = numpy.array([0.9] * 15)
+    n = numpy.array([0.9] * 15)
+
+    print forward_backward(o, f, i, n)
+
+if __name__ == "__main__":
+    sys.exit(main())
