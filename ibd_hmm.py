@@ -96,13 +96,14 @@ def prob_obs_noibd(freq, unused_obs_match):
 
 def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     """
+    
     """
     fwd_ibd_scaled = numpy.empty(len(observations))
     fwd_noibd_scaled = numpy.empty(len(observations))
     fwd_scale = numpy.empty(len(observations))
 
     # Forward probabilities
-    # fill in the first, assume an equal chance of starting in an ibd segment.
+    # fill in the first, chance of starting in IBD is 1 / N_generations
     fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * (1.0 / gens)
     fwd_noibd_scaled[0] = (prob_obs_noibd(freqs[0], observations[0])
                            * ((gens - 1.0) / gens))
