@@ -14,18 +14,50 @@ import numpy
 #import freqs
 
 
-def pos_to_idb_prob(rec, positions):
+def prob_no_recomb(gens, gdist):
     """
-    Takes RecMap object and a list of positions and returns a vector that
-    contains the transition probabilities of remaining in the IBD state.
+    Returns the probability of no recombination occuring within the span of
+    distance gdist (in centimorgans) across 'gens' generations.
+
+    Args:
+        gens: Number of generations (int > 0)
+        gdist: A genetic distance in centimorgans.
+    Returns:
+        The probability of no recombinations occuring in 'gens' generations.
+    """
+    return 1 - (1 - gdist / 100.) ** gens
+
+
+def state_trans(rec, gens, chrm, positions):
+    """
+    Takes RecMap object, a number of generations, a chromosome ID and a list
+    of positions and returns two vectors that contain the transition
+    probabilities of remaining in the IBD state and the no IBD state.
 
     Args:
         rec: A RecMap object containing a genetic map.
+        gens: Number of generations between historic and present-day individual.
+        chrm: The chromosome ID for the positions.
         positions: a numpy vector of base positions
     Returns:
-        a numpy vector containing transition probabilities of remaining IBD
+        numpy vectors containing transition probabilities of remaining IBD
+        and remaining in a no-IBD segment.
     """
-    return
+    ibd_trs = numpy.empty_like(positions)
+
+    ibd_trs[0] = 0.0
+
+    for i in xrange(1, len(positions)):
+        gen_dist = rec.distance(chrm, positions[i - 1], positions[i])
+        ibd_trs[i] = prob_no_recomb(gens, gen_dist)
+
+    # Important: any recombination will break an IBD segment, but a
+    # recombination in a no IBD segment can be in between two no IBD segments.
+    # Weight noibd transitions accordingly.
+    noibd_trs = numpy.add(gens - 1, ibd_trs)
+    noibd_trs = numpy.divide(noibd_trs, gens, noibd_trs)
+
+    return ibd_trs, noibd_trs
 
 
 def prob_obs_ibd(freq, obs_match):
