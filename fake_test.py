@@ -26,7 +26,7 @@ def match_found(hi_geno, lo_obs):
     return True
 
 
-def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage, err)
+def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage)
     """
     Simulates low-coverage sequencing from a recent historical ancestor (low_i)
     of a present-day individul (hi_indv) by sampling SNP entries from a VCF
@@ -41,10 +41,9 @@ def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage, err)
         lo_indv: ID of the low-coverage, historic individual.
         hi_indv: ID of the high-coverage, present day individual.
         coverage: depth of sequencing in the historic individual.
-        err: rate at which erroneous bases occur in historic observations.
     Returns:
         positions: A vector of chromosome positions where an observation
-                   was made
+                   was made.
         match: A vector of booleans indicating whether the observe historic
                base matched one of the present-day bases.
     """
@@ -54,7 +53,6 @@ def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage, err)
     for rec in vcf_in:
         if numpy.random.poisson(coverage) != 1:
             continue # position was not observed or observed too many times.
-        obs_pos.append(rec.pos)
         hi_geno = rec.samples[hi_indv]['GT']
         lo_geno = random.choice(rec.samples[lo_indv]['GT'])
         if ibd_segs.overlaps(rec.pos):
@@ -62,6 +60,7 @@ def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage, err)
                 # observing from IBD segment.
                 lo_geno = hi_geno[0]
             # else: observing from other chromosome.
+        obs_pos.append(rec.pos)
         obs_state.append(match_found(hi_geno, lo_geno))
     return numpy.array(obs_pos), numpy.array(obs_state)
 
