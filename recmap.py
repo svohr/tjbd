@@ -60,7 +60,7 @@ class RecMap(object):
             last_dist = dist
         return
 
-    def gene_dist(self, chrm, start, end):
+    def distance(self, chrm, start, end):
         """
         Return an estimate of the genetic distance between physical positions
         'start' and 'end' on chromosome 'chrm'. If a map distance partially
