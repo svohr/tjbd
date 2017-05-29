@@ -96,7 +96,23 @@ def prob_obs_noibd(freq, unused_obs_match):
 
 def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     """
-    
+    Finds the posterior probability of the historic and present-day
+    individuals sharing an IBD segment at each observed position using
+    the forward-backward algorithm.
+
+    Args:
+        gens: number of generations between historic and present-day
+              individual (int > 0)
+        observations: Sequence of observations. Numpy vector of bools
+                      for whether historic matched one of the present-day
+                      alleles for all observed positions.
+        ibd_trs: Numpy vector containing probabilities of remaining in IBD
+                 segment between the current and previous positions.
+        noibd_trs: Numpy vector containing probabilities of remaining in no IBD
+                   segment between the current and previous positions.
+    Returns:
+        A numpy vector containing the posterior probability of each position
+        being in an IBD segment.
     """
     fwd_ibd_scaled = numpy.empty(len(observations))
     fwd_noibd_scaled = numpy.empty(len(observations))
