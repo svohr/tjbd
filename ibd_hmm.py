@@ -76,16 +76,16 @@ def prob_obs_ibd(freq, obs_match):
     return freq / 2.0 # no match observed
 
 
-def prob_obs_noibd(freq, unused_obs_match):
+def prob_obs_noibd(freq, _):
     """
     Returns the probability of making observation "obs" outside of an
     IBD segment.
 
     Args:
         freq: Frequency of observed base in historic population.
-        obs_match: boolean whether historical allele matches one of the
-                   present day alelle. Not used in no IBD, but kept as
-                   an argument for symmetry.
+        _ (obs_match): boolean whether historical allele matches one of the
+                       present day alelle. Not used in no IBD, but kept as
+                       an argument for symmetry.
     Returns:
         The probability observation "obs_match" outside of an IBD segment.
     """
