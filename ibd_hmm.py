@@ -76,7 +76,7 @@ def prob_obs_ibd(freq, obs_match):
     return freq / 2.0 # no match observed
 
 
-def prob_obs_noibd(freq, obs_match):
+def prob_obs_noibd(freq, unused_obs_match):
     """
     Returns the probability of making observation "obs" outside of an
     IBD segment.
@@ -84,7 +84,8 @@ def prob_obs_noibd(freq, obs_match):
     Args:
         freq: Frequency of observed base in historic population.
         obs_match: boolean whether historical allele matches one of the
-                   present day alelle.
+                   present day alelle. Not used in no IBD, but kept as
+                   an argument for symmetry.
     Returns:
         The probability observation "obs_match" outside of an IBD segment.
     """
@@ -93,7 +94,7 @@ def prob_obs_noibd(freq, obs_match):
     return freq
 
 
-def forward_backward(observations, freqs, ibd_trs, noibd_trs):
+def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     """
     """
     fwd_ibd_scaled = numpy.empty(len(observations))
@@ -102,9 +103,9 @@ def forward_backward(observations, freqs, ibd_trs, noibd_trs):
 
     # Forward probabilities
     # fill in the first, assume an equal chance of starting in an ibd segment.
-    # TODO: This should probably not be equal.
-    fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * 0.5
-    fwd_noibd_scaled[0] = prob_obs_noibd(freqs[0], observations[0]) * 0.5
+    fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * (1.0 / gens)
+    fwd_noibd_scaled[0] = (prob_obs_noibd(freqs[0], observations[0])
+                           * ((gens - 1.0) / gens))
     fwd_scale[0] = fwd_ibd_scaled[0] + fwd_noibd_scaled[0]
     fwd_ibd_scaled[0] /= fwd_scale[0]
     fwd_noibd_scaled[0] /= fwd_scale[0]
@@ -166,7 +167,7 @@ def main():
     i = numpy.array([0.9] * 15)
     n = numpy.array([0.9] * 15)
 
-    print forward_backward(o, f, i, n)
+    print forward_backward(6, o, f, i, n)
     return 0
 
 
