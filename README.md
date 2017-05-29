@@ -17,10 +17,10 @@ Hidden         +----+        |----------------------->|        +----+
                       |     \                          /     |
                       |      \                        /      |
                       |       \                      /       |
-           (1+f_tj)/2 |        \         f_tj       /        | 1-f_tj
+           (1+f_tj)/2 |        \         f_tj       /        | f_tj
                       |    +----\------------------+         |
                       |    |     +----------------------+    |
-                      |    |           (1-f_tj)/2       |    |
+                      |    |           f_tj/2           |    |
                       v    v                            v    v
                     +--------+                        +--------+
 Observed            |        |                        |        |
@@ -31,7 +31,6 @@ Observed            |        |                        |        |
 f_tj = Frequency of observed historical base in population
    D = Probability of recombination per generation (genetic distance in Morgans)
    g = Number of generations between historical and present-day individuals
-
 ```
 
 ## Inputs
