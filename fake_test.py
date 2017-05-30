@@ -11,9 +11,17 @@ Mon May 29 15:37:59 PDT 2017
 
 import sys
 import random
+import argparse
 
 import numpy
 import pysam
+import intervaltree
+
+
+def pick_ibd_segments():
+    ibd = intervaltree.IntervalTree()
+    ibd[10000000:30000000] = 1
+    return ibd
 
 
 def match_found(hi_geno, lo_obs):
@@ -66,6 +74,16 @@ def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage)
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("vcf_fn", metavar="vars.vcf[.gz]", type=str,
+                        help="VCF file containing genotypes for individuals")
+    args = parser.parse_args()
+
+    ibd_segs = pick_ibd_segments()
+    with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
+        pos, obs = simulate_hmm_input(vcf_in, ibd_segs, 1, 2, 0.01)
+        for p, o in itertools.izip(pos, obs):
+            print p, o, ibd_segs.overlaps(p)
     return 0
 
 
