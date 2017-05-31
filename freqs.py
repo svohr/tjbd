@@ -44,7 +44,7 @@ class AlleleFreqs(object):
             items = line.split('\t')
             chrm = items[0]
             pos = int(items[1])
-            total = items[3]
+            total = int(items[3])
             for count_pair in items[4:]:
                 base, _, count = count_pair.rpartition(':')
                 self.freqs[_key(chrm, pos, base)] = float(count) / total
