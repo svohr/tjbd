@@ -47,13 +47,13 @@ class RecMap(object):
         last_pos = None
         last_dist = None
         for line in rec_in:
-            items = line.split('\n')
+            items = line.split('\t')
             chrm = items[0]
             pos = int(items[1])
             dist = float(items[2])
 
-            if chrm == last_chrm:
-                self.scaf_ints[chrm][last_pos, pos] = dist - last_dist
+            if chrm == last_chrm and pos != last_pos:
+                self.scaf_ints[chrm][last_pos:pos] = dist - last_dist
 
             last_chrm = chrm
             last_pos = pos
@@ -73,10 +73,9 @@ class RecMap(object):
             end: The end position of the interval (end > start)
         returns: a genetic distance in centimorgans
         """
-        # super simple version of this.
-        interval = intervaltree.Interval(start, end)
-        if not interval:
+        if not self.scaf_ints[chrm].overlaps(start, end):
             return None # query interval not included in the map.
+        interval = intervaltree.Interval(start, end)
         total_dist = 0.0
         for map_interval in self.scaf_ints[chrm][start:end]:
             if interval.contains_interval(map_interval):
