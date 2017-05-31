@@ -25,7 +25,21 @@ def prob_no_recomb(gens, gdist):
     Returns:
         The probability of no recombinations occuring in 'gens' generations.
     """
-    return 1 - (1 - gdist / 100.) ** gens
+    return (1 - gdist / 100.) ** gens
+
+
+def bg_rec_rate(start, end):
+    """
+    Returns a genetic distance based on an average recombination rate of
+    1 centimorgan per megabase.
+
+    Args:
+        start: Start position of interval.
+        end: End position of interval.
+    Returns:
+        a genetic distance between start and end.
+    """
+    return float(end - start) / 1000000.0
 
 
 def state_trans(rec, gens, chrm, positions):
@@ -43,12 +57,14 @@ def state_trans(rec, gens, chrm, positions):
         numpy vectors containing transition probabilities of remaining IBD
         and remaining in a no-IBD segment.
     """
-    ibd_trs = numpy.empty_like(positions)
+    ibd_trs = numpy.empty(len(positions))
 
-    ibd_trs[0] = 0.0
+    ibd_trs[0] = 1.0
 
     for i in xrange(1, len(positions)):
         gen_dist = rec.distance(chrm, positions[i - 1], positions[i])
+        if not gen_dist:
+            gen_dist = bg_rec_rate(positions[i - 1], positions[i])
         ibd_trs[i] = prob_no_recomb(gens, gen_dist)
 
     # Important: any recombination will break an IBD segment, but a
