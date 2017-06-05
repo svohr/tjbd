@@ -24,6 +24,13 @@ import ibd_hmm
 
 
 def pick_ibd_segments():
+    """
+    Chooses intervals of a chromosome to be simulated as Identitical by
+    descent.
+
+    Args: None
+    Returns: An interval tree containing IBD segments.
+    """
     ibd = intervaltree.IntervalTree()
     ibd[19000000:25000000] = 1
     return ibd
@@ -71,16 +78,45 @@ def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage):
         hi_samp = rec.samples[hi_indv]
         lo_samp = rec.samples[lo_indv]
         hi_geno = hi_samp['GT']
-        lo_geno = random.choice(lo_samp['GT'])
-        if ibd_segs.overlaps(rec.pos):
-            if random.choice([True, False]):
-                # observing from IBD segment.
-                lo_geno = hi_geno[0]
+        lo_chrm = random.choice([0, 1])
+        lo_geno = lo_samp['GT'][lo_chrm]
+        if ibd_segs.overlaps(rec.pos) and lo_chrm == 0:
+            # observing from IBD segment.
+            lo_geno = hi_geno[0]
             # else: observing from other chromosome.
         obs_pos.append(rec.pos)
         obs_hi_geno.append(hi_geno)
         obs_lo_geno.append(lo_geno)
     return numpy.array(obs_pos), obs_hi_geno, obs_lo_geno
+
+
+def find_matches(obs_hi, obs_lo):
+    """
+    Compares the high-coverage genotypes with the low-coverage observations
+    and produces a list of bools indicating whether a match was found.
+
+    Args:
+        obs_hi: List of high-coverage genotypes stored as 2-ples of strings.
+        obs_lo: List of low-coverage observations (single base (string))
+    Returns:
+        A list of booleans indicating wheather a match was found or not.
+    """
+    return [match_found(h, l) for h, l in itertools.izip(obs_hi, obs_lo)]
+
+
+def get_frequencies(frqs, chrm, pos, obs):
+    """
+    Finds the allele frequencies for the bases observed at the given positions.
+
+    Args:
+        chrm: a chromosome ID
+        pos: a list of chromosome positions (int)
+        obs: a list of single base observations (string)
+    Returns:
+        a numpy vector of allele frequencies
+    """
+    return numpy.array([frqs.frequency(chrm, p, b)
+                        for p, b in itertools.izip(pos, obs)])
 
 
 def main():
@@ -94,6 +130,8 @@ def main():
     args = parser.parse_args()
 
     ibd_segs = pick_ibd_segments()
+    ngen = 5
+    chrom = "21"
 
     frqs = freqs.AlleleFreqs()
     with open(args.frq_fn, 'r') as frq_in:
@@ -104,15 +142,23 @@ def main():
         rmap.read_tab(rec_in)
 
     with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
-        pos, obs_hi, obs_lo = simulate_hmm_input(vcf_in, ibd_segs, "HG00097", "HG00099", 0.05)
-        obs = [match_found(h, l) for h, l in itertools.izip(obs_hi, obs_lo)]
-        lo_freq = numpy.array([frqs.frequency("21", p, b) for p, b in itertools.izip(pos, obs_lo)])
 
-        ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, 5, "21", pos)
-        probs = ibd_hmm.forward_backward(5, obs, lo_freq, ibd_trs, noibd_trs)
-        lprobs = ibd_hmm.forward_backward_log_prob(5, obs, lo_freq, ibd_trs, noibd_trs)
-        for p, o, f, i, n, prob, l in itertools.izip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs, lprobs):
-            print p, "match" if o else "no-match", "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l
+        for i in xrange(10):
+            hi_indv, lo_indv = random.samples(vcf_in.header.samples, 2)
+            pos, obs_hi, obs_lo = simulate_hmm_input(vcf_in,
+                                                     ibd_segs,
+                                                     lo_indv,
+                                                     hi_indv,
+                                                     0.01)
+            obs = find_matches(obs_hi, obs_lo)
+            lo_freq = get_frequencies(frqs, chrom, pos, obs_lo)
+
+            ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, ngen, chrom, pos)
+
+            probs = ibd_hmm.forward_backward(ngen, obs, lo_freq, ibd_trs, noibd_trs)
+            lprobs = ibd_hmm.forward_backward_log_prob(ngen, obs, lo_freq, ibd_trs, noibd_trs)
+            for p, o, f, i, n, prob, l in itertools.izip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs, lprobs):
+                print "%s_%s" % (hi_indv, lo_indv), chrom, p, ngen, "match" if o else "no-match", "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l
 
     return 0
 
