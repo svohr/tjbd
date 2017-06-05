@@ -171,9 +171,10 @@ def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
 
     # forward probabilities
     # fill in the first, chance of starting in IBD is 1 / N_generations
-    fwd_ibd[0] = logprob_obs_ibd(freqs[0], observations[0]) * (1.0 / gens)
+    fwd_ibd[0] = (logprob_obs_ibd(freqs[0], observations[0])
+                  + numpy.log(1.0 / gens))
     fwd_noibd[0] = (logprob_obs_noibd(freqs[0], observations[0])
-                    * ((gens - 1.0) / gens))
+                    + numpy.log((gens - 1.0) / gens))
 
     for i, obs in enumerate(observations):
         if i == 0:
@@ -195,8 +196,8 @@ def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
     bwd_ibd = numpy.empty_like(fwd_ibd)
     bwd_noibd = numpy.empty_like(fwd_noibd)
 
-    bwd_ibd[-1] = 1.0
-    bwd_noibd[-1] = 1.0
+    bwd_ibd[-1] = 0.0
+    bwd_noibd[-1] = 0.0
 
     for i in xrange(len(observations) - 2, -1, -1):
         bwd_ibd[i] = numpy.logaddexp(ibd_stay[i + 1]
