@@ -110,8 +110,9 @@ def main():
 
         ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, 5, "21", pos)
         probs = ibd_hmm.forward_backward(5, obs, lo_freq, ibd_trs, noibd_trs)
-        for p, o, f, i, n, prob in itertools.izip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs):
-            print p, "match" if o else "no-match", "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob
+        lprobs = ibd_hmm.forward_backward_log_prob(5, obs, lo_freq, ibd_trs, noibd_trs)
+        for p, o, f, i, n, prob, l in itertools.izip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs, lprobs):
+            print p, "match" if o else "no-match", "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l
 
     return 0
 
