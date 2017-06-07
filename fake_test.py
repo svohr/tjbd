@@ -81,6 +81,7 @@ def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage):
         lo_chrm = random.choice([0, 1])
         lo_geno = lo_samp['GT'][lo_chrm]
         if ibd_segs.overlaps(rec.pos) and lo_chrm == 0:
+            print "ha"
             # observing from IBD segment.
             lo_geno = hi_geno[0]
             # else: observing from other chromosome.
@@ -141,10 +142,10 @@ def main():
     with open(args.rec_fn, 'r') as rec_in:
         rmap.read_tab(rec_in)
 
-    with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
 
-        for i in xrange(10):
-            hi_indv, lo_indv = random.samples(vcf_in.header.samples, 2)
+    for i in xrange(10):
+        with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
+            hi_indv, lo_indv = random.sample(vcf_in.header.samples, 2)
             pos, obs_hi, obs_lo = simulate_hmm_input(vcf_in,
                                                      ibd_segs,
                                                      lo_indv,
@@ -152,14 +153,12 @@ def main():
                                                      0.01)
             obs = find_matches(obs_hi, obs_lo)
             lo_freq = get_frequencies(frqs, chrom, pos, obs_lo)
-
             ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, ngen, chrom, pos)
 
             probs = ibd_hmm.forward_backward(ngen, obs, lo_freq, ibd_trs, noibd_trs)
             lprobs = ibd_hmm.forward_backward_log_prob(ngen, obs, lo_freq, ibd_trs, noibd_trs)
             for p, o, f, i, n, prob, l in itertools.izip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs, lprobs):
                 print "%s_%s" % (hi_indv, lo_indv), chrom, p, ngen, "match" if o else "no-match", "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l
-
     return 0
 
 
