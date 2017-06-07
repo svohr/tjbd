@@ -82,13 +82,15 @@ def prob_obs_ibd(freq, obs_match):
 
     Args:
         freq: Frequency of observed base in historic population.
-        obs_match: boolean whether historical allele matches one of the
-                   present day alelle.
+        obs_match: Number of times in historical allele was observed in the
+                   present-day individual (0, 1, or 2)
     Returns:
         The probability observation "obs_match" within an IBD segment.
     """
-    if obs_match:
+    if obs_match == 2:
         return (1 + freq) / 2.0
+    elif obs_match == 1:
+        return (1 + 2 * freq) / 4.0
     return freq / 2.0 # no match observed
 
 
@@ -99,9 +101,9 @@ def prob_obs_noibd(freq, _):
 
     Args:
         freq: Frequency of observed base in historic population.
-        _ (obs_match): boolean whether historical allele matches one of the
-                       present day alelle. Not used in no IBD, but kept as
-                       an argument for symmetry.
+        obs_match: Number of times in historical allele was observed in the
+                   present-day individual (0, 1, or 2). Not used in no IBD,
+                   but kept as an argument for symmetry.
     Returns:
         The probability observation "obs_match" outside of an IBD segment.
     """
@@ -150,9 +152,9 @@ def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
     Args:
         gens: number of generations between historic and present-day
               individual (int > 0)
-        observations: Sequence of observations. Numpy vector of bools
-                      for whether historic matched one of the present-day
-                      alleles for all observed positions.
+        observations: Sequence of observations.
+        freqs: Numpy vector of allele frequencies for each observed historical
+               allele
         ibd_trs: Numpy vector containing probabilities of remaining in IBD
                  segment between the current and previous positions.
         noibd_trs: Numpy vector containing probabilities of remaining in no IBD
@@ -230,9 +232,9 @@ def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     Args:
         gens: number of generations between historic and present-day
               individual (int > 0)
-        observations: Sequence of observations. Numpy vector of bools
-                      for whether historic matched one of the present-day
-                      alleles for all observed positions.
+        observations: Sequence of observations.
+        freqs: Numpy vector of allele frequencies for each observed historical
+               allele
         ibd_trs: Numpy vector containing probabilities of remaining in IBD
                  segment between the current and previous positions.
         noibd_trs: Numpy vector containing probabilities of remaining in no IBD

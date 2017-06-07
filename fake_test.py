@@ -41,9 +41,7 @@ def match_found(hi_geno, lo_obs):
     Returns True if the low-coverage observation matches one of the alleles
     in the high-coverage genotype, False otherwise.
     """
-    if lo_obs != hi_geno[0]:
-        return lo_obs == hi_geno[1]
-    return True
+    return sum(h == lo_obs for h in hi_geno)
 
 
 def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage):
@@ -81,7 +79,6 @@ def simulate_hmm_input(vcf_in, ibd_segs, lo_indv, hi_indv, coverage):
         lo_chrm = random.choice([0, 1])
         lo_geno = lo_samp['GT'][lo_chrm]
         if ibd_segs.overlaps(rec.pos) and lo_chrm == 0:
-            print "ha"
             # observing from IBD segment.
             lo_geno = hi_geno[0]
             # else: observing from other chromosome.
@@ -158,7 +155,7 @@ def main():
             probs = ibd_hmm.forward_backward(ngen, obs, lo_freq, ibd_trs, noibd_trs)
             lprobs = ibd_hmm.forward_backward_log_prob(ngen, obs, lo_freq, ibd_trs, noibd_trs)
             for p, o, f, i, n, prob, l in itertools.izip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs, lprobs):
-                print "%s_%s" % (hi_indv, lo_indv), chrom, p, ngen, "match" if o else "no-match", "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l
+                print "%s_%s" % (hi_indv, lo_indv), chrom, p, ngen, o, "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l
     return 0
 
 
