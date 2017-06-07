@@ -147,7 +147,7 @@ def main():
                                                      ibd_segs,
                                                      lo_indv,
                                                      hi_indv,
-                                                     0.01)
+                                                     0.05)
             obs = find_matches(obs_hi, obs_lo)
             lo_freq = get_frequencies(frqs, chrom, pos, obs_lo)
             ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, ngen, chrom, pos)
