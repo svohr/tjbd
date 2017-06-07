@@ -59,7 +59,7 @@ def state_trans(rec, gens, chrm, positions):
     """
     ibd_trs = numpy.empty(len(positions))
 
-    ibd_trs[0] = 1.0
+    ibd_trs[0] = 0.99999
 
     for i in xrange(1, len(positions)):
         gen_dist = rec.distance(chrm, positions[i - 1], positions[i])
