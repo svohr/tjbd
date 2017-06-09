@@ -112,6 +112,88 @@ def prob_obs_noibd(freq, _):
     return freq
 
 
+def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
+    """
+    Finds the posterior probability of the historic and present-day
+    individuals sharing an IBD segment at each observed position using
+    the forward-backward algorithm.
+
+    Args:
+        gens: number of generations between historic and present-day
+              individual (int > 0)
+        observations: Sequence of observations.
+        freqs: Numpy vector of allele frequencies for each observed historical
+               allele
+        ibd_trs: Numpy vector containing probabilities of remaining in IBD
+                 segment between the current and previous positions.
+        noibd_trs: Numpy vector containing probabilities of remaining in no IBD
+                   segment between the current and previous positions.
+    Returns:
+        A numpy vector containing the posterior probability of each position
+        being in an IBD segment.
+    """
+    fwd_ibd_scaled = numpy.empty(len(observations))
+    fwd_noibd_scaled = numpy.empty(len(observations))
+    fwd_scale = numpy.empty(len(observations))
+
+    # Forward probabilities
+    # fill in the first, chance of starting in IBD is 1 / N_generations
+    fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * (1.0 / gens)
+    fwd_noibd_scaled[0] = (prob_obs_noibd(freqs[0], observations[0])
+                           * ((gens - 1.0) / gens))
+    fwd_scale[0] = fwd_ibd_scaled[0] + fwd_noibd_scaled[0]
+    fwd_ibd_scaled[0] /= fwd_scale[0]
+    fwd_noibd_scaled[0] /= fwd_scale[0]
+
+    for i, obs in enumerate(observations):
+        if i == 0:
+            continue
+        ibd_tmp = ((prob_obs_ibd(freqs[i], obs)
+                    * fwd_ibd_scaled[i - 1]
+                    * ibd_trs[i])
+                   + (prob_obs_ibd(freqs[i], obs)
+                      * fwd_noibd_scaled[i - 1]
+                      * (1 - noibd_trs[i])))
+        noibd_tmp = ((prob_obs_noibd(freqs[i], obs)
+                      * fwd_noibd_scaled[i - 1]
+                      * noibd_trs[i])
+                     + (prob_obs_noibd(freqs[i], obs)
+                        * fwd_ibd_scaled[i - 1]
+                        * (1 - ibd_trs[i])))
+        fwd_scale[i] = ibd_tmp + noibd_tmp
+        fwd_ibd_scaled[i] = ibd_tmp / fwd_scale[i]
+        fwd_noibd_scaled[i] = noibd_tmp / fwd_scale[i]
+
+    # Backward probabilities
+    bwd_ibd_scaled = numpy.empty(len(observations))
+    bwd_noibd_scaled = numpy.empty(len(observations))
+
+    bwd_ibd_scaled[-1] = 1.0
+    bwd_noibd_scaled[-1] = 1.0
+
+    for i in xrange(len(observations) - 2, -1, -1):
+        scale = fwd_scale[i + 1]
+        bwd_ibd_scaled[i] = ((ibd_trs[i + 1]
+                              * prob_obs_ibd(freqs[i + 1],
+                                             observations[i + 1])
+                              * bwd_ibd_scaled[i + 1])
+                             + ((1 - ibd_trs[i + 1])
+                                * prob_obs_noibd(freqs[i + 1],
+                                                 observations[i + 1])
+                                * bwd_noibd_scaled[i + 1])) / scale
+        bwd_noibd_scaled[i] = ((noibd_trs[i + 1]
+                                * prob_obs_noibd(freqs[i + 1],
+                                                 observations[i + 1])
+                                * bwd_noibd_scaled[i + 1])
+                               + ((1 - noibd_trs[i + 1])
+                                  * prob_obs_ibd(freqs[i + 1],
+                                                 observations[i + 1])
+                                  * bwd_ibd_scaled[i + 1])) / scale
+
+    # posterior decoding:
+    return fwd_ibd_scaled * bwd_ibd_scaled
+
+
 def logprob_obs_ibd(freq, obs_match):
     """
     To avoid clutter from calls to numpy.log, wraps a call to prob_obs_ibd
@@ -221,88 +303,6 @@ def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
     post_prob = (fwd_ibd + bwd_ibd) - numpy.logaddexp(fwd_ibd[-1],
                                                       fwd_noibd[-1])
     return numpy.exp(post_prob)
-
-
-def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
-    """
-    Finds the posterior probability of the historic and present-day
-    individuals sharing an IBD segment at each observed position using
-    the forward-backward algorithm.
-
-    Args:
-        gens: number of generations between historic and present-day
-              individual (int > 0)
-        observations: Sequence of observations.
-        freqs: Numpy vector of allele frequencies for each observed historical
-               allele
-        ibd_trs: Numpy vector containing probabilities of remaining in IBD
-                 segment between the current and previous positions.
-        noibd_trs: Numpy vector containing probabilities of remaining in no IBD
-                   segment between the current and previous positions.
-    Returns:
-        A numpy vector containing the posterior probability of each position
-        being in an IBD segment.
-    """
-    fwd_ibd_scaled = numpy.empty(len(observations))
-    fwd_noibd_scaled = numpy.empty(len(observations))
-    fwd_scale = numpy.empty(len(observations))
-
-    # Forward probabilities
-    # fill in the first, chance of starting in IBD is 1 / N_generations
-    fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * (1.0 / gens)
-    fwd_noibd_scaled[0] = (prob_obs_noibd(freqs[0], observations[0])
-                           * ((gens - 1.0) / gens))
-    fwd_scale[0] = fwd_ibd_scaled[0] + fwd_noibd_scaled[0]
-    fwd_ibd_scaled[0] /= fwd_scale[0]
-    fwd_noibd_scaled[0] /= fwd_scale[0]
-
-    for i, obs in enumerate(observations):
-        if i == 0:
-            continue
-        ibd_tmp = ((prob_obs_ibd(freqs[i], obs)
-                    * fwd_ibd_scaled[i - 1]
-                    * ibd_trs[i])
-                   + (prob_obs_ibd(freqs[i], obs)
-                      * fwd_noibd_scaled[i - 1]
-                      * (1 - noibd_trs[i])))
-        noibd_tmp = ((prob_obs_noibd(freqs[i], obs)
-                      * fwd_noibd_scaled[i - 1]
-                      * noibd_trs[i])
-                     + (prob_obs_noibd(freqs[i], obs)
-                        * fwd_ibd_scaled[i - 1]
-                        * (1 - ibd_trs[i])))
-        fwd_scale[i] = ibd_tmp + noibd_tmp
-        fwd_ibd_scaled[i] = ibd_tmp / fwd_scale[i]
-        fwd_noibd_scaled[i] = noibd_tmp / fwd_scale[i]
-
-    # Backward probabilities
-    bwd_ibd_scaled = numpy.empty(len(observations))
-    bwd_noibd_scaled = numpy.empty(len(observations))
-
-    bwd_ibd_scaled[-1] = 1.0
-    bwd_noibd_scaled[-1] = 1.0
-
-    for i in xrange(len(observations) - 2, -1, -1):
-        scale = fwd_scale[i + 1]
-        bwd_ibd_scaled[i] = ((ibd_trs[i + 1]
-                              * prob_obs_ibd(freqs[i + 1],
-                                             observations[i + 1])
-                              * bwd_ibd_scaled[i + 1])
-                             + ((1 - ibd_trs[i + 1])
-                                * prob_obs_noibd(freqs[i + 1],
-                                                 observations[i + 1])
-                                * bwd_noibd_scaled[i + 1])) / scale
-        bwd_noibd_scaled[i] = ((noibd_trs[i + 1]
-                                * prob_obs_noibd(freqs[i + 1],
-                                                 observations[i + 1])
-                                * bwd_noibd_scaled[i + 1])
-                               + ((1 - noibd_trs[i + 1])
-                                  * prob_obs_ibd(freqs[i + 1],
-                                                 observations[i + 1])
-                                  * bwd_ibd_scaled[i + 1])) / scale
-
-    # posterior decoding:
-    return fwd_ibd_scaled * bwd_ibd_scaled
 
 
 def main():
