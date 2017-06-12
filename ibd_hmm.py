@@ -49,8 +49,6 @@ def state_trans(rec, gens, chrm, positions):
 
     for i in xrange(1, len(positions)):
         gen_dist = rec.distance(chrm, positions[i - 1], positions[i])
-        if gen_dist < 0:
-            print gen_dist, chrm, positions[i - 1], positions[i]
         ibd_trs[i] = prob_no_recomb(gens, gen_dist)
 
     # Important: any recombination will break an IBD segment, but a
