@@ -2,7 +2,7 @@
 recmap.py
 
 This file contains functions for reading a genetic map (or recombination map)
-into an interval tree so genetic distance can be estimated for arbitrary
+into two sorted lists so genetic distance can be estimated for arbitrary
 physical distances (in base pairs).
 
 """
@@ -33,7 +33,6 @@ class RecMap(object):
     physical intervals (in base pairs).
 
     Attributes:
-        scaf_ints: A dictionary storing the interval tree for each chromosome.
         scaf_ppos: A dictionary storing a sorted list of physical positions
         scaf_gpos: A dictionary storing a sorted list of the corresponding
                    genetic positions.
@@ -52,28 +51,22 @@ class RecMap(object):
 
     def read_tab(self, rec_in):
         """
-        Read genetic distances in from a tab delimited file containing
-        markers (physical positions) and genetic distances (in centimorgans)
-        and populate the interval tree for each chromosome.
+        Read physical and genetic positions in from a tab delimited file
+        containing markers (chromosome IDs and physical positions) and genetic
+        distances (in centimorgans) and populates the internal lists for each
+        chromosome. Input is assumed to be sorted by physical position.
 
-        Args:
-            rec_in: a file object for reading the recombination map.
+        Args: rec_in: a file object for reading the recombination map.
         Returns: nothing
         """
-        last_chrm = None
-        last_pos = None
         for line in rec_in:
             items = line.split('\t')
             chrm = items[0]
             pos = int(items[1])
             gpos = float(items[2])
 
-            if chrm == last_chrm and pos != last_pos:
-                self.scaf_ppos[chrm].append(pos)
-                self.scaf_gpos[chrm].append(gpos)
-
-            last_chrm = chrm
-            last_pos = pos
+            self.scaf_ppos[chrm].append(pos)
+            self.scaf_gpos[chrm].append(gpos)
         return
 
     def _index_gen_position(self, chrm, pos, idx):
