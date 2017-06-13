@@ -139,8 +139,9 @@ def main():
     with open(args.rec_fn, 'r') as rec_in:
         rmap.read_tab(rec_in)
 
+    random.seed("35")
 
-    for i in xrange(10):
+    for i in xrange(1):
         with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
             hi_indv, lo_indv = random.sample(vcf_in.header.samples, 2)
             pos, obs_hi, obs_lo = simulate_hmm_input(vcf_in,
