@@ -22,7 +22,38 @@ def read_composites(cmp_in):
     pos = hap_tab[:, 1].astype(int)
     gpos = hap_tab[:, 2].astype(float)
     haps = hap_tab[:, 3:]
-    return
+    return pos, gpos, haps
+
+
+def generate_individuals(gpos, haps, n_indvs, segsize):
+    """
+    Takes the starting set of composite haplotypes and builds 'n_indvs'
+    diploid individuals by choosing two haplotypes at random. Also
+    generates IBD blocks for the given segment size for pairs of individuals
+    i and i+1 for even i indexes.
+
+    Args:
+        gpos: genetic positions for each marker (used to generate IBD).
+        haps: matrix of SNP markers (rows) and composite haplotypes (cols)
+        n_indvs: An even number of individuals to generate from the starting
+                 haplotypes.
+        segsize: The size (in cMs) of IBD blocks to generate)
+    Returns:
+        indv_haps: matrix of individuals sharing IBD
+        ibd_blocks: A dictionary storing the segments that are in IBD.
+    """
+    sample = random.sample(range(len(haps[0])), n_indvs * 2)
+    indv_haps = haps[:, sample]
+    ibd_blocks = dict()
+    for i in xrange(n_indvs * 2, 4):
+        donor = random.choice([0, 1])
+        recpt = random.choice([2, 3])
+
+        ibd_seg = pick_ibd_block(gpos, segsize)
+        indv_haps[ibd_seg, i + recpt] = indv_haps[ibd_seg, i + donor]
+        ibd_blocks[i % 2, (i % 2) + 1] = ibd_seg
+        ibd_blocks[(i % 2) + 1, i % 2] = ibd_seg
+    return indv_haps, ibd_blocks
 
 
 def pick_ibd_block(gpos, segsize):
