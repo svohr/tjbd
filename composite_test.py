@@ -17,6 +17,16 @@ import freqs
 
 def read_composites(cmp_in):
     """
+    Reads in a table produced by 'composite_haps.py' containing physical
+    coordinates (chrm ID and position), genetic position, and observed alleles
+    for composite haplotypes.
+
+    Args:
+        cmp_in: file containing composite haplotypes.
+    Returns:
+        pos: physical positions on the chromosome.
+        gpos: genetic positions on the chromosome.
+        haps: observed bases for each haplotype (column) and SNP (row).
     """
     hap_tab = numpy.loadtxt(cmp_in)
     pos = hap_tab[:, 1].astype(int)
