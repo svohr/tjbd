@@ -81,6 +81,27 @@ def pick_ibd_block(gpos, segsize):
     return (gpos >= ibd_start) & (gpos < ibd_start + segsize)
 
 
+def encode_observations(indv_haps):
+    pass
+
+
+def run_trial(indv_haps, idb_blocks, coverage):
+    """
+    Runs the IBD HMM on all permuations of individuals. A low-coverage sample
+    is generated for each individual and compared against the full genotypes
+    of all other individuals.
+    """
+    for lo_samp in xrange(0, len(indv_haps), 2):
+        # generate low-coverage.
+        # mask remaining haplotypes.
+        for hi_samp in xrange(0, len(indv_haps), 2):
+            if lo_samp == hi_samp:
+                continue
+            # run comparison
+
+    return
+
+
 def main():
     return 0
 
