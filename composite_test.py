@@ -81,8 +81,45 @@ def pick_ibd_block(gpos, segsize):
     return (gpos >= ibd_start) & (gpos < ibd_start + segsize)
 
 
-def encode_observations(indv_haps):
-    pass
+def sample_historical(indv_haps, indv, coverage):
+    """
+    Simulates low-coverage sequencing of a historic individual. Produces
+    a vector of observed bases and a mask indicating which positions where
+    observed.
+
+    Args:
+        indv_haps: numpy array of haplotypes.
+        indv: ID for starting individual.
+        coverage: amout of sequence coverage to simulate.
+    Returns:
+        obs_mask: a vector of booleans indicating which positions were
+                  observed.
+        lo_obs: a vector containing a single observation for each observed
+                position.
+    """
+    obs_mask = numpy.random.poisson(coverage, indv_haps.shape[0])
+    return obs_mask, lo_obs
+
+
+def encode_observations(indv_haps, indv, obs_mask, lo_obs):
+    """
+    Generates a vector containing the number of times the historical allele
+    was found in the modern individual for each observed position (0, 1 or 2).
+
+    Args:
+        indv_haps: numpy array of haplotypes.
+        indv: ID for diploid individual to compare.
+        obs_mask: boolean vector indicating whether a position was observed
+                  in the historical sample.
+        lo_obs: vector of observed bases from historical sample
+    Returns:
+        A vector containing the number of times the historical base was found
+        in the modern individual for each position (0, 1, or 2).
+    """
+    counts = numpy.zeros_like(obs_mask)
+    for phase in [0, 1]:
+        counts += (indv_haps[obs_mask, (indv * 2) + phase] == lo_obs)
+    return counts
 
 
 def run_trial(indv_haps, idb_blocks, coverage):
