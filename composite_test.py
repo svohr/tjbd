@@ -8,11 +8,13 @@ individuals.
 import sys
 import argparse
 import random
+import itertools
 
 import numpy
 
-import rec
+import recmap
 import freqs
+import ibd_hmm
 
 
 def read_composites(cmp_in):
@@ -104,7 +106,7 @@ def sample_historical(indv_haps, indv, coverage):
     return obs_mask, lo_obs
 
 
-def encode_observations(indv_haps, indv, obs_mask, lo_obs):
+def encode_observations(indv_haps, indv, lo_obs):
     """
     Generates a vector containing the number of times the historical allele
     was found in the modern individual for each observed position (0, 1 or 2).
@@ -119,31 +121,109 @@ def encode_observations(indv_haps, indv, obs_mask, lo_obs):
         A vector containing the number of times the historical base was found
         in the modern individual for each position (0, 1, or 2).
     """
-    counts = numpy.zeros_like(obs_mask)
+    counts = numpy.zeros(len(lo_obs))
     for phase in [0, 1]:
-        counts += (indv_haps[obs_mask, (indv * 2) + phase] == lo_obs)
+        counts += indv_haps[:, (indv * 2) + phase] == lo_obs
     return counts
 
 
-def run_trial(indv_haps, idb_blocks, coverage):
+def get_frequencies(frqs, chrm, pos, obs):
+    """
+    Finds the allele frequencies for the bases observed at the given positions.
+
+    Args:
+        chrm: a chromosome ID
+        pos: a list of chromosome positions (int)
+        obs: a list of single base observations (string)
+    Returns:
+        a numpy vector of allele frequencies
+    """
+    return numpy.array([frqs.frequency(chrm, p, b)
+                        for p, b in itertools.izip(pos, obs)])
+
+
+def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
     """
     Runs the IBD HMM on all permuations of individuals. A low-coverage sample
     is generated for each individual and compared against the full genotypes
     of all other individuals.
     """
-    for lo_samp in xrange(0, len(indv_haps), 2):
+    n_indv = len(indv_haps) / 2
+    res_indv = numpy.zeros([n_indv * (n_indv - 1)], 3)
+    i = 0
+    for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
+        sub_mask, lo_obs = sample_historical(indv_haps, ibd_blocks, cov)
         # mask remaining haplotypes.
-        for hi_samp in xrange(0, len(indv_haps), 2):
+        sub_haps = indv_haps[sub_mask, ]
+        sub_pos = pos[sub_mask]
+
+        lo_freq = get_frequencies(frqs, chrm, sub_pos, lo_obs)
+        ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, ngen, chrm, sub_pos)
+
+        for hi_samp in xrange(0, n_indv):
             if lo_samp == hi_samp:
                 continue
-            # run comparison
-
+            hmm_observed = encode_observations(sub_haps, hi_samp, lo_obs)
+            hmm_post_probs = ibd_hmm.forward_backward(ngen,
+                                                      hmm_observed,
+                                                      lo_freq,
+                                                      ibd_trs,
+                                                      noibd_trs)
+            if (lo_samp, hi_samp) in ibd_blocks:
+                res_indv[i, 0] = 1
+            res_indv[i, 1] = numpy.max(hmm_post_probs)
+            i += 1
     return
 
 
 def main():
+    """
+    Runs a trial of the IBD HMM used by tjbd with the given parameters.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("hap_fn", metavar="composite.haps", type=str,
+                        help="File containing starting composite haplotypes.")
+    parser.add_argument("frq_fn", metavar="frqs.count", type=str,
+                        help="Allele counts by SNP site")
+    parser.add_argument("rec_fn", metavar="recmap.tab", type=str,
+                        help="Genetic distances in tab file.")
+    parser.add_argument("-c", "--chr", metavar="CHROM", type=str, default=1,
+                        help="Chromosome ID")
+    parser.add_argument("-g", "--gen", metavar="N", type=int, default=5,
+                        help="Approximate number of generations between "
+                             "low-coverage and high-coverage individuals.")
+    parser.add_argument("-l", "--coverage", metavar="COVERAGE", default=0.01,
+                        help="Sequencing coverage level to simulate for "
+                             "low-coverage samples.")
+    parser.add_argument("-s", "--seg-size", dest="seg_size", type=float,
+                        default=10.0, metavar="cM",
+                        help="Size in cM of IBD segments to simulate")
+    parser.add_argument("-n", "--n-indv", dest="n_indv", type=int,
+                        default=None, metavar="N",
+                        help="Number of individuals to simulate (must be even "
+                             "and <= number of haplotypes / 2)")
+    parser.add_argument("-r", "--seed", type=int, default=None,
+                        help="Set the seed for random numbers.")
+    args = parser.parse_args()
+
+    frqs = freqs.AlleleFreqs()
+    with open(args.frq_fn, 'r') as frq_in:
+        frqs.read_vcf_counts(frq_in)
+
+    rmap = recmap.RecMap()
+    with open(args.rec_fn, 'r') as rec_in:
+        rmap.read_tab(rec_in)
+
+    with open(args.hap_fn, 'r') as hap_in:
+        pos, _, comp_haps = read_composites(hap_in)
+
+        # set number of test individuals if necessary
+        if not args.n_indv or args.n_indv * 2 > comp_haps.shape[1]:
+            args.n_indv = comp_haps.shape[1] / 2 / 2 * 2
+
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
