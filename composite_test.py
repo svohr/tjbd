@@ -98,6 +98,9 @@ def sample_historical(indv_haps, indv, coverage):
                 position.
     """
     obs_mask = numpy.random.poisson(coverage, indv_haps.shape[0])
+    obs_chrm = numpy.random.choice([2 * indv, (2 * indv) + 1],
+                                   indv_haps.shape[0])
+    lo_obs = indv_haps[obs_mask, obs_chrm]
     return obs_mask, lo_obs
 
 
