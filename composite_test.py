@@ -30,11 +30,16 @@ def read_composites(cmp_in):
         gpos: genetic positions on the chromosome.
         haps: observed bases for each haplotype (column) and SNP (row).
     """
-    hap_tab = numpy.loadtxt(cmp_in)
-    pos = hap_tab[:, 1].astype(int)
-    gpos = hap_tab[:, 2].astype(float)
-    haps = hap_tab[:, 3:]
-    return pos, gpos, haps
+    pos = list()
+    gpos = list()
+    haps = list()
+
+    for line in cmp_in:
+        items = line.split('\t')
+        pos.append(int(items[1]))
+        gpos.append(float(items[2]))
+        haps.append(items[3:])
+    return numpy.array(pos), numpy.array(gpos), numpy.array(haps)
 
 
 def generate_individuals(gpos, haps, n_indvs, segsize):
@@ -206,6 +211,10 @@ def main():
     parser.add_argument("-r", "--seed", type=int, default=None,
                         help="Set the seed for random numbers.")
     args = parser.parse_args()
+
+    if args.seed is not None:
+        numpy.random.seed(args.seed)
+        random.seed(args.seed)
 
     frqs = freqs.AlleleFreqs()
     with open(args.frq_fn, 'r') as frq_in:
