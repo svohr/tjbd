@@ -63,14 +63,14 @@ def generate_individuals(gpos, haps, n_indvs, segsize):
     sample = random.sample(range(len(haps[0])), n_indvs * 2)
     indv_haps = haps[:, sample]
     ibd_blocks = dict()
-    for i in xrange(n_indvs * 2, 4):
+    for i in xrange(0, n_indvs * 2, 4):
         donor = random.choice([0, 1])
         recpt = random.choice([2, 3])
 
         ibd_seg = pick_ibd_block(gpos, segsize)
         indv_haps[ibd_seg, i + recpt] = indv_haps[ibd_seg, i + donor]
-        ibd_blocks[i % 2, (i % 2) + 1] = ibd_seg
-        ibd_blocks[(i % 2) + 1, i % 2] = ibd_seg
+        ibd_blocks[i / 2, (i / 2) + 1] = ibd_seg
+        ibd_blocks[(i / 2) + 1, i / 2] = ibd_seg
     return indv_haps, ibd_blocks
 
 
@@ -105,10 +105,10 @@ def sample_historical(indv_haps, indv, coverage):
         lo_obs: a vector containing a single observation for each observed
                 position.
     """
-    obs_mask = numpy.random.poisson(coverage, indv_haps.shape[0])
+    obs_mask = numpy.random.poisson(coverage, indv_haps.shape[0]) == 1
     obs_chrm = numpy.random.choice([2 * indv, (2 * indv) + 1],
                                    indv_haps.shape[0])
-    lo_obs = indv_haps[obs_mask, obs_chrm]
+    lo_obs = indv_haps[obs_mask, obs_chrm[obs_mask]]
     return obs_mask, lo_obs
 
 
@@ -154,12 +154,12 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
     is generated for each individual and compared against the full genotypes
     of all other individuals.
     """
-    n_indv = len(indv_haps) / 2
-    res_indv = numpy.zeros([n_indv * (n_indv - 1)], 3)
+    n_indv = indv_haps.shape[1] / 2
+    res_indv = numpy.zeros([n_indv * (n_indv - 1), 3])
     i = 0
     for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
-        sub_mask, lo_obs = sample_historical(indv_haps, ibd_blocks, cov)
+        sub_mask, lo_obs = sample_historical(indv_haps, lo_samp, cov)
         # mask remaining haplotypes.
         sub_haps = indv_haps[sub_mask, ]
         sub_pos = pos[sub_mask]
@@ -180,7 +180,7 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
                 res_indv[i, 0] = 1
             res_indv[i, 1] = numpy.max(hmm_post_probs)
             i += 1
-    return
+    return res_indv
 
 
 def main():
@@ -194,15 +194,16 @@ def main():
                         help="Allele counts by SNP site")
     parser.add_argument("rec_fn", metavar="recmap.tab", type=str,
                         help="Genetic distances in tab file.")
-    parser.add_argument("-c", "--chr", metavar="CHROM", type=str, default=1,
+    parser.add_argument("-c", "--chrom", metavar="CHROM", type=str, default=1,
                         help="Chromosome ID")
-    parser.add_argument("-g", "--gen", metavar="N", type=int, default=5,
+    parser.add_argument("-g", "--gen", metavar="N", dest="ngen",
+                        type=int, default=5,
                         help="Approximate number of generations between "
                              "low-coverage and high-coverage individuals.")
     parser.add_argument("-l", "--coverage", metavar="COVERAGE", default=0.01,
                         help="Sequencing coverage level to simulate for "
                              "low-coverage samples.")
-    parser.add_argument("-s", "--seg-size", dest="seg_size", type=float,
+    parser.add_argument("-s", "--seg-size", dest="segsize", type=float,
                         default=10.0, metavar="cM",
                         help="Size in cM of IBD segments to simulate")
     parser.add_argument("-n", "--n-indv", dest="n_indv", type=int,
@@ -226,12 +227,20 @@ def main():
         rmap.read_tab(rec_in)
 
     with open(args.hap_fn, 'r') as hap_in:
-        pos, _, comp_haps = read_composites(hap_in)
+        pos, gpos, init_haps = read_composites(hap_in)
 
         # set number of test individuals if necessary
-        if not args.n_indv or args.n_indv * 2 > comp_haps.shape[1]:
-            args.n_indv = comp_haps.shape[1] / 2 / 2 * 2
+        if not args.n_indv or args.n_indv * 2 > init_haps.shape[1]:
+            args.n_indv = init_haps.shape[1] / 2 / 2 * 2
 
+        indv_haps, indv_ibd = generate_individuals(gpos,
+                                                   init_haps,
+                                                   args.n_indv,
+                                                   args.segsize)
+        res = run_trial(rmap, frqs, indv_haps, indv_ibd,
+                        args.chrom, pos, args.coverage, args.ngen)
+        print res
+        print indv_ibd.keys()
     return 0
 
 
