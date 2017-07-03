@@ -289,6 +289,41 @@ def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
     return numpy.exp(post_prob)
 
 
+def find_ibd_blocks(post_probs, hi_score, lo_score):
+    """
+    Takes a vector of posterior probablilities from the forward backward
+    algorithm and identifies regions containing high posterior probabilities
+    (>hi_score) that are uninterrupted by probabilities lower than lo_score.
+
+    Args:
+        post_probs: vector of posterior probabilities from the
+                    forward-backward algorithm.
+        hi_score: value required to begin and end a IBD block.
+        lo_score: value that interrupts an IBD block.
+    Returns:
+        A vector indicating whether a position is in an IBD block (1) or
+        not (0) for each position.
+    """
+    called_ibd = numpy.zeros_like(post_probs)
+
+    in_ibd = False
+    block_start = None
+    block_stop = None
+
+    for i, prob in enumerate(post_probs):
+        if not in_ibd and prob > hi_score:
+            in_ibd = True
+            block_start = i
+            block_stop = i
+        else:
+            if prob > hi_score:
+                block_stop = i
+            elif prob < lo_score:
+                called_ibd[block_start:block_stop + 1] = 1
+                in_ibd = False
+    return called_ibd
+
+
 def main():
     o = [False, False, False, True, True, False, True,
          False, False, False, False, False, True, False, False]
