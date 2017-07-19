@@ -183,6 +183,9 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
     return res_indv
 
 
+def result_summary(ibd_blocks, lo_samp, hi_samp, post_prob):
+    return
+
 def main():
     """
     Runs a trial of the IBD HMM used by tjbd with the given parameters.
@@ -239,8 +242,6 @@ def main():
                                                    args.segsize)
         res = run_trial(rmap, frqs, indv_haps, indv_ibd,
                         args.chrom, pos, args.coverage, args.ngen)
-        print res
-        print indv_ibd.keys()
     return 0
 
 
