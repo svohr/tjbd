@@ -155,8 +155,6 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
     of all other individuals.
     """
     n_indv = indv_haps.shape[1] / 2
-    res_indv = numpy.zeros([n_indv * (n_indv - 1), 3])
-    i = 0
     for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
         sub_mask, lo_obs = sample_historical(indv_haps, lo_samp, cov)
@@ -176,15 +174,21 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
                                                       lo_freq,
                                                       ibd_trs,
                                                       noibd_trs)
-            if (lo_samp, hi_samp) in ibd_blocks:
-                res_indv[i, 0] = 1
-            res_indv[i, 1] = numpy.max(hmm_post_probs)
-            i += 1
-    return res_indv
-
-
-def result_summary(ibd_blocks, lo_samp, hi_samp, post_prob):
     return
+
+
+def result_summary(ibd_blocks, lo_samp, hi_samp, post_prob, results):
+    """
+    Need a function that compares the true ibd blocks and the inferred
+    ibd blocks and produces a confusion matrix:
+
+                    Detected Relatedness
+                    True     False
+    Related: True   X        X
+             False  X        X
+    """
+    return
+
 
 def main():
     """
