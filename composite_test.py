@@ -177,19 +177,6 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
     return
 
 
-def result_summary(ibd_blocks, lo_samp, hi_samp, post_prob, results):
-    """
-    Need a function that compares the true ibd blocks and the inferred
-    ibd blocks and produces a confusion matrix:
-
-                    Detected Relatedness
-                    True     False
-    Related: True   X        X
-             False  X        X
-    """
-    return
-
-
 def main():
     """
     Runs a trial of the IBD HMM used by tjbd with the given parameters.
