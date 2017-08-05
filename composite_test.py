@@ -10,6 +10,7 @@ import sys
 import argparse
 import random
 import itertools
+import collections
 
 import numpy
 
@@ -62,7 +63,11 @@ def generate_individuals(gpos, haps, n_indvs, segsize):
     """
     sample = random.sample(range(len(haps[0])), n_indvs * 2)
     indv_haps = haps[:, sample]
-    ibd_blocks = dict()
+
+    # keep an empty vector for unrelated individuals
+    no_ibd = pick_ibd_block(gpos, 0)
+    no_ibd.flags.writeable = False
+    ibd_blocks = collections.defaultdict(lambda : return no_ibd)
     for i in xrange(0, n_indvs * 2, 4):
         donor = random.choice([0, 1])
         recpt = random.choice([2, 3])
