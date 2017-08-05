@@ -1,6 +1,8 @@
 """
 """
 
+import itertools
+
 import numpy
 
 
@@ -8,8 +10,8 @@ class ConfusionTable(object):
     def __init__(self):
         """
         """
-        self.relatedness = numpy.zeros((2,2))
-        self.positional = numpy.zeros((2,2))
+        self.relatedness = numpy.zeros((2, 2))
+        self.positional = numpy.zeros((2, 2))
         return
 
     def update(self, ibd_segs, called_segs):
@@ -47,3 +49,12 @@ class ConfusionTable(object):
     def pos_tp(self):
         return self.relatedness[1, 1]
 
+    def rel_sensitivity(self):
+        return self.relatedness[1, 1] / sum(self.relatedness[1, ])
+    def rel_fpr(self):
+        return self.relatedness[0, 1] / sum(self.relatedness[:, 1])
+
+    def pos_sensitivity(self):
+        return self.positional[1, 1] / sum(self.positional[1, ])
+    def pos_fpr(self):
+        return self.positional[0, 1] / sum(self.positional[:, 1])
