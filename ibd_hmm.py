@@ -304,22 +304,23 @@ def find_ibd_blocks(post_probs, hi_score, lo_score):
         A vector indicating whether a position is in an IBD block (1) or
         not (0) for each position.
     """
-    called_ibd = numpy.zeros_like(post_probs)
+    called_ibd = numpy.zeros(len(post_probs), dtype=numpy.bool)
 
     in_ibd = False
     block_start = None
     block_stop = None
 
     for i, prob in enumerate(post_probs):
-        if not in_ibd and prob > hi_score:
-            in_ibd = True
-            block_start = i
-            block_stop = i
+        if not in_ibd:
+            if prob > hi_score:
+                in_ibd = True
+                block_start = i
+                block_stop = i
         else:
             if prob > hi_score:
                 block_stop = i
             elif prob < lo_score:
-                called_ibd[block_start:block_stop + 1] = 1
+                called_ibd[block_start:block_stop + 1] = True
                 in_ibd = False
     return called_ibd
 
