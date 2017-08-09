@@ -169,15 +169,15 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, args):
         sub_haps = indv_haps[sub_mask, ]
         sub_pos = pos[sub_mask]
 
-        lo_freq = get_frequencies(frqs, args.chrm, sub_pos, lo_obs)
-        ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, args.gen,
-                                                 args.chrm, sub_pos)
+        lo_freq = get_frequencies(frqs, args.chrom, sub_pos, lo_obs)
+        ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, args.ngen,
+                                                 args.chrom, sub_pos)
 
         for hi_samp in xrange(0, n_indv):
             if lo_samp == hi_samp:
                 continue
             hmm_observed = encode_observations(sub_haps, hi_samp, lo_obs)
-            hmm_post_probs = ibd_hmm.forward_backward(args.gen,
+            hmm_post_probs = ibd_hmm.forward_backward(args.ngen,
                                                       hmm_observed,
                                                       lo_freq,
                                                       ibd_trs,
