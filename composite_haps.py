@@ -71,7 +71,7 @@ def write_composites(out, vcf_rec, gpos, compo_src):
         nothing.
     """
     out.write("%s\t%d\t%f" % (vcf_rec.chrom, vcf_rec.pos, gpos))
-    for compo, src in enumerate(compo_src):
+    for _, src in enumerate(compo_src):
         out.write("\t%s\t%s" % vcf_rec.samples[src]["GT"])
     out.write("\n")
     return
@@ -113,4 +113,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

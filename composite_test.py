@@ -17,6 +17,7 @@ import numpy
 import recmap
 import freqs
 import ibd_hmm
+import confusion
 
 
 def read_composites(cmp_in):
@@ -67,7 +68,7 @@ def generate_individuals(gpos, haps, n_indvs, segsize):
     # keep an empty vector for unrelated individuals
     no_ibd = pick_ibd_block(gpos, 0)
     no_ibd.flags.writeable = False
-    ibd_blocks = collections.defaultdict(lambda : return no_ibd)
+    ibd_blocks = collections.defaultdict(lambda: no_ibd)
     for i in xrange(0, n_indvs * 2, 4):
         donor = random.choice([0, 1])
         recpt = random.choice([2, 3])
@@ -153,33 +154,39 @@ def get_frequencies(frqs, chrm, pos, obs):
                         for p, b in itertools.izip(pos, obs)])
 
 
-def run_trial(rmap, frqs, indv_haps, ibd_blocks, chrm, pos, cov, ngen):
+def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, args):
     """
     Runs the IBD HMM on all permuations of individuals. A low-coverage sample
     is generated for each individual and compared against the full genotypes
     of all other individuals.
     """
     n_indv = indv_haps.shape[1] / 2
+    results = confusion.ConfusionTable()
     for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
-        sub_mask, lo_obs = sample_historical(indv_haps, lo_samp, cov)
+        sub_mask, lo_obs = sample_historical(indv_haps, lo_samp, args.coverage)
         # mask remaining haplotypes.
         sub_haps = indv_haps[sub_mask, ]
         sub_pos = pos[sub_mask]
 
-        lo_freq = get_frequencies(frqs, chrm, sub_pos, lo_obs)
-        ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, ngen, chrm, sub_pos)
+        lo_freq = get_frequencies(frqs, args.chrm, sub_pos, lo_obs)
+        ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, args.gen,
+                                                 args.chrm, sub_pos)
 
         for hi_samp in xrange(0, n_indv):
             if lo_samp == hi_samp:
                 continue
             hmm_observed = encode_observations(sub_haps, hi_samp, lo_obs)
-            hmm_post_probs = ibd_hmm.forward_backward(ngen,
+            hmm_post_probs = ibd_hmm.forward_backward(args.gen,
                                                       hmm_observed,
                                                       lo_freq,
                                                       ibd_trs,
                                                       noibd_trs)
-    return
+            called_ibd = ibd_hmm.find_ibd_blocks(hmm_post_probs,
+                                                 args.max_run,
+                                                 args.min_run)
+            results.update(ibd_blocks[lo_samp, hi_samp], called_ibd)
+    return results
 
 
 def main():
@@ -209,6 +216,12 @@ def main():
                         default=None, metavar="N",
                         help="Number of individuals to simulate (must be even "
                              "and <= number of haplotypes / 2)")
+    parser.add_argument("-m", dest="min_run", type=float, default=0.5,
+                        help="Minimum post. prob to allow in a detected "
+                             "IBD segment.")
+    parser.add_argument("-M", dest="max_run", type=float,
+                        metavar="M", default=0.95,
+                        help="Call IBD runs using post. probs exceeding M.")
     parser.add_argument("-r", "--seed", type=int, default=None,
                         help="Set the seed for random numbers.")
     args = parser.parse_args()
@@ -236,8 +249,9 @@ def main():
                                                    init_haps,
                                                    args.n_indv,
                                                    args.segsize)
-        res = run_trial(rmap, frqs, indv_haps, indv_ibd,
-                        args.chrom, pos, args.coverage, args.ngen)
+        res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, args)
+        sys.stdout.write("%f\t%f\n" % (res.rel_sensitivity(), res.rel_fpr()))
+        sys.stdout.write("%f\t%f\n" % (res.pos_sensitivity(), res.pos_fpr()))
     return 0
 
 
