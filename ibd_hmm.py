@@ -319,7 +319,7 @@ def find_ibd_blocks(post_probs, hi_score, lo_score):
         else:
             if prob > hi_score:
                 block_stop = i
-            elif prob < lo_score:
+            elif prob < lo_score and block_stop > block_start:
                 called_ibd[block_start:block_stop + 1] = True
                 in_ibd = False
     return called_ibd
