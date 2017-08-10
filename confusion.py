@@ -10,8 +10,8 @@ class ConfusionTable(object):
     def __init__(self):
         """
         """
-        self.relatedness = numpy.zeros((2, 2))
-        self.positional = numpy.zeros((2, 2))
+        self.relatedness = numpy.zeros((2, 2), dtype=numpy.uint32)
+        self.positional = numpy.zeros((2, 2), dtype=numpy.uint32)
         return
 
     def update(self, ibd_segs, called_segs):
@@ -26,9 +26,10 @@ class ConfusionTable(object):
         returns:
             Nothing.
         """
-        self.relatedness[ibd_segs.any(0), called_segs.any(0)] += 1
+        self.relatedness[1 if ibd_segs.any() else 0,
+                         1 if called_segs.any() else 0] += 1
         for ibd, call in itertools.izip(ibd_segs, called_segs):
-            self.positional[ibd, call] += 1
+            self.positional[1 if ibd else 0, 1 if call else 0] += 1
         return
 
     def rel_tn(self):
@@ -50,11 +51,11 @@ class ConfusionTable(object):
         return self.relatedness[1, 1]
 
     def rel_sensitivity(self):
-        return self.relatedness[1, 1] / sum(self.relatedness[1, ])
+        return numpy.float(self.relatedness[1, 1]) / sum(self.relatedness[1, ])
     def rel_fpr(self):
-        return self.relatedness[0, 1] / sum(self.relatedness[:, 1])
+        return numpy.float(self.relatedness[0, 1]) / sum(self.relatedness[:, 1])
 
     def pos_sensitivity(self):
-        return self.positional[1, 1] / sum(self.positional[1, ])
+        return numpy.float(self.positional[1, 1]) / sum(self.positional[1, ])
     def pos_fpr(self):
-        return self.positional[0, 1] / sum(self.positional[:, 1])
+        return numpy.float(self.positional[0, 1]) / sum(self.positional[:, 1])

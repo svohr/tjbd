@@ -185,7 +185,7 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, args):
             called_ibd = ibd_hmm.find_ibd_blocks(hmm_post_probs,
                                                  args.max_run,
                                                  args.min_run)
-            results.update(ibd_blocks[lo_samp, hi_samp], called_ibd)
+            results.update(ibd_blocks[lo_samp, hi_samp][sub_mask], called_ibd)
     return results
 
 
@@ -216,11 +216,11 @@ def main():
                         default=None, metavar="N",
                         help="Number of individuals to simulate (must be even "
                              "and <= number of haplotypes / 2)")
-    parser.add_argument("-m", dest="min_run", type=float, default=0.5,
+    parser.add_argument("-m", dest="min_run", type=float, default=0.8,
                         help="Minimum post. prob to allow in a detected "
                              "IBD segment.")
     parser.add_argument("-M", dest="max_run", type=float,
-                        metavar="M", default=0.95,
+                        metavar="M", default=0.98,
                         help="Call IBD runs using post. probs exceeding M.")
     parser.add_argument("-r", "--seed", type=int, default=None,
                         help="Set the seed for random numbers.")
@@ -252,6 +252,8 @@ def main():
         res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, args)
         sys.stdout.write("%f\t%f\n" % (res.rel_sensitivity(), res.rel_fpr()))
         sys.stdout.write("%f\t%f\n" % (res.pos_sensitivity(), res.pos_fpr()))
+        print res.positional
+        print res.relatedness
     return 0
 
 
