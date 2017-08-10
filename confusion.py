@@ -53,9 +53,13 @@ class ConfusionTable(object):
     def rel_sensitivity(self):
         return numpy.float(self.relatedness[1, 1]) / sum(self.relatedness[1, ])
     def rel_fpr(self):
+        return numpy.float(self.relatedness[0, 1]) / sum(self.relatedness[0, ])
+    def rel_fdr(self):
         return numpy.float(self.relatedness[0, 1]) / sum(self.relatedness[:, 1])
 
     def pos_sensitivity(self):
         return numpy.float(self.positional[1, 1]) / sum(self.positional[1, ])
     def pos_fpr(self):
+        return numpy.float(self.positional[0, 1]) / sum(self.positional[0, ])
+    def pos_fdr(self):
         return numpy.float(self.positional[0, 1]) / sum(self.positional[:, 1])
