@@ -98,7 +98,7 @@ def pick_ibd_block(gpos, segsize):
 def sample_historical(indv_haps, indv, coverage):
     """
     Simulates low-coverage sequencing of a historic individual. Produces
-    a vector of observed bases and a mask indicating which positions where
+    a vector of observed bases and a mask indicating which positions were
     observed.
 
     Args:
@@ -150,8 +150,8 @@ def get_frequencies(frqs, chrm, pos, obs):
     Returns:
         a numpy vector of allele frequencies
     """
-    return numpy.array([frqs.frequency(chrm, p, b)
-                        for p, b in itertools.izip(pos, obs)])
+    return numpy.array((frqs.frequency(chrm, p, b)
+                        for p, b in itertools.izip(pos, obs)))
 
 
 def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, args):
