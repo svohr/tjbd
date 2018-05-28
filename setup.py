@@ -8,5 +8,5 @@ setup(
     author='Samuel H. Vohr',
     author_email='svohr@soe.ucsc.edu',
     license='MIT',
-    install_requires=['numpy', 'scipy', 'pysam', 'intervaltree']
+    install_requires=['numpy', 'scipy', 'pandas', 'pysam', 'intervaltree']
     )
