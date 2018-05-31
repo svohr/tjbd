@@ -150,24 +150,25 @@ def get_frequencies(frqs, chrm, pos, obs):
     Returns:
         a numpy vector of allele frequencies
     """
-    return numpy.array((frqs.frequency(chrm, p, b)
-                        for p, b in itertools.izip(pos, obs)))
+    return numpy.array([frqs.frequency(chrm, p, b)
+                        for p, b in itertools.izip(pos, obs)])
 
 
-def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, args):
+def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
     """
     Runs the IBD HMM on all permuations of individuals. A low-coverage sample
     is generated for each individual and compared against the full genotypes
     of all other individuals.
     """
     n_indv = indv_haps.shape[1] / 2
-    results = confusion.ConfusionTable()
+    results = confusion.TrialResults()
     for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
         sub_mask, lo_obs = sample_historical(indv_haps, lo_samp, args.coverage)
         # mask remaining haplotypes.
         sub_haps = indv_haps[sub_mask, ]
         sub_pos = pos[sub_mask]
+        sub_gpos = gpos[sub_mask]
 
         lo_freq = get_frequencies(frqs, args.chrom, sub_pos, lo_obs)
         ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, args.ngen,
@@ -185,7 +186,11 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, args):
             called_ibd = ibd_hmm.find_ibd_blocks(hmm_post_probs,
                                                  args.max_run,
                                                  args.min_run)
-            results.update(ibd_blocks[lo_samp, hi_samp][sub_mask], called_ibd)
+            results.update(sub_pos,
+                           sub_gpos,
+                           hmm_post_probs,
+                           ibd_blocks[lo_samp, hi_samp][sub_mask],
+                           called_ibd)
     return results
 
 
@@ -249,11 +254,8 @@ def main():
                                                    init_haps,
                                                    args.n_indv,
                                                    args.segsize)
-        res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, args)
-        sys.stdout.write("%f\t%f\n" % (res.rel_sensitivity(), res.rel_fpr()))
-        sys.stdout.write("%f\t%f\n" % (res.pos_sensitivity(), res.pos_fpr()))
-        print res.positional
-        print res.relatedness
+        res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, gpos, args)
+        res.dump('bleh')
     return 0
 
 
