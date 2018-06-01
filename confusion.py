@@ -7,7 +7,7 @@ import numpy
 import pandas
 
 
-N_HIST_BINS = 1000
+N_HIST_BINS = 100
 HIST_RANGE = (0.0, 1.0)
 
 
@@ -97,24 +97,20 @@ class TrialResults(object):
             called_segs: array of booleans indicating called IBD state
         """
         seg_interval_indexes = get_segment_intervals(called_segs)
-        segs_df = pandas.DataFrame(columns=['start_idx',
-                                            'end_idx',
-                                            'num_snps',
-                                            'physical_length',
-                                            'genetic_length'])
+        segs_df = pandas.DataFrame(seg_interval_indexes,
+                                   columns=['start_index', 'end_index'])
         # TODO:
         #                                   'snp_overlap_with_ibd',
         #                                   'bp_overlap_with_ibd',
         #                                   'cm_overlap_with_ibd'])
-        segs_df[['start_idx', 'end_idx']] = seg_interval_indexes
-        segs_df['num_snps'] = segs_df['end_idx'] - segs_df['start_idx'] + 1
+        segs_df['num_snps'] = segs_df['end_index'] - segs_df['start_index'] + 1
         segs_df['physical_length'] = (
-            segs_df['end_idx'].map(lambda x: pos[x])
-            - segs_df['start_idx'].map(lambda x: pos[x])
+            segs_df['end_index'].map(lambda x: pos[x])
+            - segs_df['start_index'].map(lambda x: pos[x])
             + 1)
         segs_df['genetic_length'] = (
-            segs_df['end_idx'].map(lambda x: gpos[x])
-            - segs_df['start_idx'].map(lambda x: gpos[x])
+            segs_df['end_index'].map(lambda x: gpos[x])
+            - segs_df['start_index'].map(lambda x: gpos[x])
             + 1)
         self.segments_dfs.append(segs_df)
 
@@ -138,8 +134,11 @@ class TrialResults(object):
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
+
         # Combine segment DataFrames into a single data frame.
-        pass
+        segments_df = pandas.concat(self.segments_dfs)
+        segments_df.to_csv('{}/called_segments.tab'.format(output_dir),
+                           sep='\t', index=False)
 
 
 class ConfusionTable(object):
