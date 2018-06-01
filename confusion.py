@@ -127,6 +127,16 @@ class TrialResults(object):
             output_dir: path to directory to write table to.
         """
         # Make a DataFrame for posterior probabilities.
+        post_prob_df = pandas.DataFrame(
+            {'bin_start': self.post_prob_hist_breaks[:-1],
+             'bin_end': self.post_prob_hist_breaks[1:],
+             'ibd_count': self.post_prob_hist_ibd,
+             'noibd_count': self.post_prob_hist_noibd})
+        post_prob_df.to_csv(
+            '{}/posterior_probs_histogram.tab'.format(output_dir),
+            columns=['bin_start', 'bin_end', 'ibd_count', 'noibd_count'],
+            sep='\t', index=False)
+
         # Write table for positional accuracy and relatedness detection.
         # Combine segment DataFrames into a single data frame.
         pass
