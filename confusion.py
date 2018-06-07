@@ -6,7 +6,6 @@ runs of tjbd.
 import numpy
 import pandas
 
-
 N_HIST_BINS = 100
 HIST_RANGE = (0.0, 1.0)
 
@@ -99,19 +98,21 @@ class TrialResults(object):
         seg_interval_indexes = get_segment_intervals(called_segs)
         segs_df = pandas.DataFrame(seg_interval_indexes,
                                    columns=['start_index', 'end_index'])
-        # TODO:
-        #                                   'snp_overlap_with_ibd',
-        #                                   'bp_overlap_with_ibd',
-        #                                   'cm_overlap_with_ibd'])
+        # TODO: make sure types are correct for indexes.
         segs_df['num_snps'] = segs_df['end_index'] - segs_df['start_index'] + 1
         segs_df['physical_length'] = (
             segs_df['end_index'].map(lambda x: pos[x])
-            - segs_df['start_index'].map(lambda x: pos[x])
-            + 1)
+            - segs_df['start_index'].map(lambda x: pos[x]))
         segs_df['genetic_length'] = (
             segs_df['end_index'].map(lambda x: gpos[x])
-            - segs_df['start_index'].map(lambda x: gpos[x])
-            + 1)
+            - segs_df['start_index'].map(lambda x: gpos[x]))
+
+        ibd_overlap = []
+        for _, seg in segs_df.iterrows():
+            ibd_overlap.append(
+                ibd_segs[seg['start_index']: seg['end_index'] + 1].sum())
+
+        segs_df['ibd_overlap'] = ibd_overlap
         self.segments_dfs.append(segs_df)
 
     def dump(self, output_dir):
