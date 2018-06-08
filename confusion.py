@@ -97,7 +97,8 @@ class TrialResults(object):
         """
         seg_interval_indexes = get_segment_intervals(called_segs)
         segs_df = pandas.DataFrame(seg_interval_indexes,
-                                   columns=['start_index', 'end_index'])
+                                   columns=['start_index', 'end_index'],
+                                   dtype='int')
         # TODO: make sure types are correct for indexes.
         segs_df['num_snps'] = segs_df['end_index'] - segs_df['start_index'] + 1
         segs_df['physical_length'] = (
@@ -110,7 +111,7 @@ class TrialResults(object):
         ibd_overlap = []
         for _, seg in segs_df.iterrows():
             ibd_overlap.append(
-                ibd_segs[seg['start_index']: seg['end_index'] + 1].sum())
+                ibd_segs[int(seg['start_index']): int(seg['end_index']) + 1].sum())
 
         segs_df['ibd_overlap'] = ibd_overlap
         self.segments_dfs.append(segs_df)
@@ -135,6 +136,13 @@ class TrialResults(object):
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
+        # TODO: Tack on run parameters and fix output as float problem.
+        pandas.DataFrame(self.relatedness.to_series()).T.to_csv(
+            '{}/relatedness_class.tab'.format(output_dir),
+            index=False, sep='\t')
+        pandas.DataFrame(self.positional.to_series()).T.to_csv(
+            '{}/positional_class.tab'.format(output_dir),
+            index=False, sep='\t')
 
         # Combine segment DataFrames into a single data frame.
         segments_df = pandas.concat(self.segments_dfs)
@@ -182,3 +190,19 @@ class ConfusionTable(object):
         return numpy.float(self.contingency[0, 1]) / sum(self.contingency[0, ])
     def false_discovery_rate(self):
         return numpy.float(self.contingency[0, 1]) / sum(self.contingency[:, 1])
+
+    def to_series(self):
+        s = pandas.Series([self.true_positives(),
+                           self.true_negatives(),
+                           self.false_positives(),
+                           self.false_negatives()],
+                          index=['true_positives',
+                                 'true_negatives',
+                                 'false_positives',
+                                 'false_negatives'],
+                          dtype='int')
+        s['sensitivity'] = self.sensitivity()
+        s['false_positive_rate'] = self.false_positive_rate()
+        s['false_discovery_rate'] = self.false_discovery_rate()
+        return s
+
