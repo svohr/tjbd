@@ -289,7 +289,7 @@ def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
     return numpy.exp(post_prob)
 
 
-def find_ibd_blocks(post_probs, hi_score, lo_score):
+def find_ibd_blocks_basic(post_probs, hi_score, lo_score):
     """
     Takes a vector of posterior probablilities from the forward backward
     algorithm and identifies regions containing high posterior probabilities
@@ -301,8 +301,8 @@ def find_ibd_blocks(post_probs, hi_score, lo_score):
         hi_score: value required to begin and end a IBD block.
         lo_score: value that interrupts an IBD block.
     Returns:
-        A vector indicating whether a position is in an IBD block (1) or
-        not (0) for each position.
+        A vector indicating whether a position is in an IBD block (True) or
+        not (False) for each position.
     """
     called_ibd = numpy.zeros(len(post_probs), dtype=numpy.bool)
 
@@ -322,6 +322,61 @@ def find_ibd_blocks(post_probs, hi_score, lo_score):
             elif prob < lo_score and block_stop > block_start:
                 called_ibd[block_start:block_stop + 1] = True
                 in_ibd = False
+    if in_ibd and block_stop > block_start:
+        called_ibd[block_start:block_stop + 1] = True
+    return called_ibd
+
+
+def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=None):
+    """
+    Takes a vector of posterior probabilities from the forward backward
+    algorithm and finds regions where the probability exceeds lo_score,
+    containing at least one point where hi_score is met and that are
+    longer than min_len as defined by the vector of positions (can be
+    either physical or genetic positions).
+
+    Args:
+        post_probs: vector of posterior probabilities from the
+                    forward-backward algorithm.
+        hi_score: value required to begin and end a IBD block.
+        lo_score: value that interrupts an IBD block.
+        pos: a vector of positions (physical or genetic) for each marker in
+             post_probs.
+        min_len: a minimum length that a contiguous segment must meet.
+    Returns:
+        A vector indicating whether a position is in an IBD block (True) or
+        not (False) for each position.
+    """
+    def set_segment_ibd(start, end):
+        """
+        Calls a segment that has met the lo_score threshold if the hi_score
+        and length requirments are met.
+        """
+        ibd_state = (post_probs[start:end + 1] >= hi_score).any()
+        if pos is not None:
+            ibd_state &= (pos[end] - pos[start]) > min_len
+        called_ibd[start:end + 1] = ibd_state
+
+    called_ibd = numpy.zeros(len(post_probs), dtype=numpy.bool)
+
+    in_ibd = False
+    block_start = None
+    block_stop = None
+
+    for i, prob in enumerate(post_probs):
+        if not in_ibd:
+            if prob >= lo_score:
+                in_ibd = True
+                block_start = i
+                block_stop = i
+        else:
+            if prob >= lo_score:
+                block_stop = i
+            else:
+                set_segment_ibd(block_start, block_stop)
+                in_ibd = False
+    if in_ibd:
+        set_segment_ibd(block_start, block_stop)
     return called_ibd
 
 
