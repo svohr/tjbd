@@ -45,11 +45,12 @@ class TrialResults(object):
                      IBD segments.
     """
 
-    def __init__(self):
+    def __init__(self, name=None, coverage=None, n_gens=None, call_params=None):
         """ initialize TrialResults object with empty results. """
-        self.name = ''
-        self.coverage = None
-        self.n_gens = None
+        self.name = name
+        self.coverage = coverage
+        self.n_gens = n_gens
+        self.call_params = call_params
 
         empty_hist, breaks = numpy.histogram([], N_HIST_BINS, HIST_RANGE)
         self.post_prob_hist_ibd = empty_hist
@@ -116,6 +117,24 @@ class TrialResults(object):
         segs_df['ibd_overlap'] = ibd_overlap
         self.segments_dfs.append(segs_df)
 
+    def _add_run_meta_data_to_df(self, stats_df):
+        """
+        Adds columns for trial run parameters to the end of a data frame.
+
+        Args:
+            stats_df: a pandas Series or DataFrame
+        """
+        if self.name is not None:
+            stats_df['trial_name'] = self.name
+        if self.coverage is not None:
+            stats_df['coverage'] = self.coverage
+        if self.n_gens is not None:
+            stats_df['n_gens'] = self.n_gens
+        if self.call_params is not None:
+            stats_df['call_low'] = self.call_params[0]
+            stats_df['call_high'] = self.call_params[1]
+            stats_df['call_length'] = self.call_params[2]
+
     def dump(self, output_dir):
         """
         Write out the aggregated results from this trial to a series of files
@@ -136,16 +155,20 @@ class TrialResults(object):
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
-        # TODO: Tack on run parameters and fix output as float problem.
-        pandas.DataFrame(self.relatedness.to_series()).T.to_csv(
+        relatedness_series = self.relatedness.to_series()
+        self._add_run_meta_data_to_df(relatedness_series)
+        pandas.DataFrame(relatedness_series).T.to_csv(
             '{}/relatedness_class.tab'.format(output_dir),
             index=False, sep='\t')
-        pandas.DataFrame(self.positional.to_series()).T.to_csv(
+        positional_series = self.positional.to_series()
+        self._add_run_meta_data_to_df(positional_series)
+        pandas.DataFrame(positional_series).T.to_csv(
             '{}/positional_class.tab'.format(output_dir),
             index=False, sep='\t')
 
         # Combine segment DataFrames into a single data frame.
         segments_df = pandas.concat(self.segments_dfs)
+        self._add_run_meta_data_to_df(segments_df)
         segments_df.to_csv('{}/called_segments.tab'.format(output_dir),
                            sep='\t', index=False)
 

@@ -161,7 +161,12 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
     of all other individuals.
     """
     n_indv = indv_haps.shape[1] / 2
-    results = confusion.TrialResults()
+    results = confusion.TrialResults('test1',
+                                     args.coverage,
+                                     args.ngen,
+                                     (args.min_run,
+                                      args.max_run,
+                                      args.min_len))
     for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
         sub_mask, lo_obs = sample_historical(indv_haps, lo_samp, args.coverage)
@@ -185,7 +190,9 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
                                                       noibd_trs)
             called_ibd = ibd_hmm.find_ibd_blocks(hmm_post_probs,
                                                  args.max_run,
-                                                 args.min_run)
+                                                 args.min_run,
+                                                 gpos,
+                                                 args.min_len)
             results.update(sub_pos,
                            sub_gpos,
                            hmm_post_probs,
@@ -227,6 +234,9 @@ def main():
     parser.add_argument("-M", dest="max_run", type=float,
                         metavar="M", default=0.98,
                         help="Call IBD runs using post. probs exceeding M.")
+    parser.add_argument("-L", dest="min_len", type=float,
+                        metavar="cM", default=0.0,
+                        help="Minimum length of IBD segment to call.")
     parser.add_argument("-r", "--seed", type=int, default=None,
                         help="Set the seed for random numbers.")
     args = parser.parse_args()
