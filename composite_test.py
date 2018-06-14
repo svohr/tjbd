@@ -162,6 +162,7 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
     """
     n_indv = indv_haps.shape[1] / 2
     results = confusion.TrialResults('test1',
+                                     args.segsize,
                                      args.coverage,
                                      args.ngen,
                                      (args.min_run,

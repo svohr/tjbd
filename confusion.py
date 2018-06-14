@@ -45,9 +45,11 @@ class TrialResults(object):
                      IBD segments.
     """
 
-    def __init__(self, name=None, coverage=None, n_gens=None, call_params=None):
+    def __init__(self, name=None, ibd_seg_size=None,
+                 coverage=None, n_gens=None, call_params=None):
         """ initialize TrialResults object with empty results. """
         self.name = name
+        self.ibd_seg_size = ibd_seg_size
         self.coverage = coverage
         self.n_gens = n_gens
         self.call_params = call_params
@@ -100,7 +102,7 @@ class TrialResults(object):
         segs_df = pandas.DataFrame(seg_interval_indexes,
                                    columns=['start_index', 'end_index'],
                                    dtype='int')
-        # TODO: make sure types are correct for indexes.
+
         segs_df['num_snps'] = segs_df['end_index'] - segs_df['start_index'] + 1
         segs_df['physical_length'] = (
             segs_df['end_index'].map(lambda x: pos[x])
@@ -126,6 +128,8 @@ class TrialResults(object):
         """
         if self.name is not None:
             stats_df['trial_name'] = self.name
+        if self.ibd_seg_size is not None:
+            stats_df['ibd_seg_size'] = self.ibd_seg_size
         if self.coverage is not None:
             stats_df['coverage'] = self.coverage
         if self.n_gens is not None:
@@ -155,16 +159,14 @@ class TrialResults(object):
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
-        relatedness_series = self.relatedness.to_series()
-        self._add_run_meta_data_to_df(relatedness_series)
-        pandas.DataFrame(relatedness_series).T.to_csv(
-            '{}/relatedness_class.tab'.format(output_dir),
-            index=False, sep='\t')
-        positional_series = self.positional.to_series()
-        self._add_run_meta_data_to_df(positional_series)
-        pandas.DataFrame(positional_series).T.to_csv(
-            '{}/positional_class.tab'.format(output_dir),
-            index=False, sep='\t')
+        relatedness_df = self.relatedness.to_df()
+        self._add_run_meta_data_to_df(relatedness_df)
+        relatedness_df.to_csv('{}/relatedness_class.tab'.format(output_dir),
+                              index=False, sep='\t')
+        positional_df = self.positional.to_df()
+        self._add_run_meta_data_to_df(positional_df)
+        positional_df.to_csv('{}/positional_class.tab'.format(output_dir),
+                             index=False, sep='\t')
 
         # Combine segment DataFrames into a single data frame.
         segments_df = pandas.concat(self.segments_dfs)
@@ -214,18 +216,17 @@ class ConfusionTable(object):
     def false_discovery_rate(self):
         return numpy.float(self.contingency[0, 1]) / sum(self.contingency[:, 1])
 
-    def to_series(self):
-        s = pandas.Series([self.true_positives(),
-                           self.true_negatives(),
-                           self.false_positives(),
-                           self.false_negatives()],
-                          index=['true_positives',
-                                 'true_negatives',
-                                 'false_positives',
-                                 'false_negatives'],
+    def to_df(self):
+        df = pandas.DataFrame([[self.true_positives(),
+                                self.true_negatives(),
+                                self.false_positives(),
+                                self.false_negatives()]],
+                          columns=['true_positives',
+                                   'true_negatives',
+                                   'false_positives',
+                                   'false_negatives'],
                           dtype='int')
-        s['sensitivity'] = self.sensitivity()
-        s['false_positive_rate'] = self.false_positive_rate()
-        s['false_discovery_rate'] = self.false_discovery_rate()
-        return s
-
+        df['sensitivity'] = self.sensitivity()
+        df['false_positive_rate'] = self.false_positive_rate()
+        df['false_discovery_rate'] = self.false_discovery_rate()
+        return df
