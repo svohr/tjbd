@@ -85,6 +85,7 @@ class TrialResults(object):
         self.post_prob_hist_noibd += numpy.histogram(post_prob[~ibd_segs],
                                                      bins=N_HIST_BINS,
                                                      range=HIST_RANGE)[0]
+        # TODO: category 3,4: post probs in comparisons with some or no ibd
         if called_segs.any():
             self._update_segments(pos, gpos, ibd_segs, called_segs)
 

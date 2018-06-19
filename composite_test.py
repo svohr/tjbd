@@ -161,7 +161,7 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
     of all other individuals.
     """
     n_indv = indv_haps.shape[1] / 2
-    results = confusion.TrialResults('test1',
+    results = confusion.TrialResults(args.trial_name,
                                      args.segsize,
                                      args.coverage,
                                      args.ngen,
@@ -240,6 +240,8 @@ def main():
                         help="Minimum length of IBD segment to call.")
     parser.add_argument("-r", "--seed", type=int, default=None,
                         help="Set the seed for random numbers.")
+    parser.add_argument("-t", "--trial-name", type=str, default='trial',
+                        help="Set the name for this trial")
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -257,16 +259,17 @@ def main():
     with open(args.hap_fn, 'r') as hap_in:
         pos, gpos, init_haps = read_composites(hap_in)
 
-        # set number of test individuals if necessary
-        if not args.n_indv or args.n_indv * 2 > init_haps.shape[1]:
-            args.n_indv = init_haps.shape[1] / 2 / 2 * 2
+    # set number of test individuals if necessary
+    if not args.n_indv or args.n_indv * 2 > init_haps.shape[1]:
+        args.n_indv = init_haps.shape[1] / 2 / 2 * 2
 
-        indv_haps, indv_ibd = generate_individuals(gpos,
-                                                   init_haps,
-                                                   args.n_indv,
-                                                   args.segsize)
-        res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, gpos, args)
-        res.dump('bleh')
+    indv_haps, indv_ibd = generate_individuals(gpos,
+                                               init_haps,
+                                               args.n_indv,
+                                               args.segsize)
+    res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, gpos, args)
+    # TODO: make this directory or provide a path to an output directory
+    res.dump(args.trial_name)
     return 0
 
 
