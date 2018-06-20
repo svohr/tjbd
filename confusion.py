@@ -36,6 +36,12 @@ class TrialResults(object):
                             probabilities for markers in true IBD state.
         post_prob_hist_noibd: numpy array storing a histogram of HMM posterior
                               probabilities for markers not in an IBD interval.
+        post_prob_hist_rel: numpy array storing a histogram of HMM posterior
+                            probabilities for markers in any IBD state when
+                            the pair shares some IBD.
+        post_prob_hist_norel: numpy array storing a histogram of HMM posterior
+                              probabilities for markers in any IBD state when
+                              there is no IBD shared between the pair.
         relatedness: A ConfusionTable comparing any detected IBD with true
                      sharing relationship.
         positional: A ConfusionTable for positional accuracy of IBD calls vs
@@ -57,6 +63,8 @@ class TrialResults(object):
         empty_hist, breaks = numpy.histogram([], N_HIST_BINS, HIST_RANGE)
         self.post_prob_hist_ibd = empty_hist
         self.post_prob_hist_noibd = empty_hist.copy()
+        self.post_prob_hist_rel = empty_hist.copy()
+        self.post_prob_hist_norel = empty_hist.copy()
         self.post_prob_hist_breaks = breaks
 
         self.relatedness = ConfusionTable()
@@ -85,7 +93,15 @@ class TrialResults(object):
         self.post_prob_hist_noibd += numpy.histogram(post_prob[~ibd_segs],
                                                      bins=N_HIST_BINS,
                                                      range=HIST_RANGE)[0]
-        # TODO: category 3,4: post probs in comparisons with some or no ibd
+        if ibd_segs.any():
+            self.post_prob_hist_rel += numpy.histogram(post_prob,
+                                                       bins=N_HIST_BINS,
+                                                       range=HIST_RANGE)[0]
+        else:
+            self.post_prob_hist_norel += numpy.histogram(post_prob,
+                                                         bins=N_HIST_BINS,
+                                                         range=HIST_RANGE)[0]
+
         if called_segs.any():
             self._update_segments(pos, gpos, ibd_segs, called_segs)
 
@@ -153,10 +169,14 @@ class TrialResults(object):
             {'bin_start': self.post_prob_hist_breaks[:-1],
              'bin_end': self.post_prob_hist_breaks[1:],
              'ibd_count': self.post_prob_hist_ibd,
-             'noibd_count': self.post_prob_hist_noibd})
+             'noibd_count': self.post_prob_hist_noibd,
+             'rel_count': self.post_prob_hist_rel,
+             'norel_count': self.post_prob_hist_norel})
         post_prob_df.to_csv(
             '{}/posterior_probs_histogram.tab'.format(output_dir),
-            columns=['bin_start', 'bin_end', 'ibd_count', 'noibd_count'],
+            columns=['bin_start', 'bin_end',
+                     'ibd_count', 'noibd_count',
+                     'rel_count', 'norel_count'],
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
@@ -222,11 +242,11 @@ class ConfusionTable(object):
                                 self.true_negatives(),
                                 self.false_positives(),
                                 self.false_negatives()]],
-                          columns=['true_positives',
-                                   'true_negatives',
-                                   'false_positives',
-                                   'false_negatives'],
-                          dtype='int')
+                              columns=['true_positives',
+                                        'true_negatives',
+                                        'false_positives',
+                                        'false_negatives'],
+                              dtype='int')
         df['sensitivity'] = self.sensitivity()
         df['false_positive_rate'] = self.false_positive_rate()
         df['false_discovery_rate'] = self.false_discovery_rate()
