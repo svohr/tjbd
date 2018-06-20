@@ -6,7 +6,7 @@ runs of tjbd.
 import numpy
 import pandas
 
-N_HIST_BINS = 100
+N_HIST_BINS = 1000
 HIST_RANGE = (0.0, 1.0)
 
 
@@ -173,7 +173,7 @@ class TrialResults(object):
              'rel_count': self.post_prob_hist_rel,
              'norel_count': self.post_prob_hist_norel})
         post_prob_df.to_csv(
-            '{}/posterior_probs_histogram.tab'.format(output_dir),
+            '{}/{}.posterior_probs_histogram.tab'.format(output_dir, self.name),
             columns=['bin_start', 'bin_end',
                      'ibd_count', 'noibd_count',
                      'rel_count', 'norel_count'],
@@ -182,17 +182,20 @@ class TrialResults(object):
         # Write table for positional accuracy and relatedness detection.
         relatedness_df = self.relatedness.to_df()
         self._add_run_meta_data_to_df(relatedness_df)
-        relatedness_df.to_csv('{}/relatedness_class.tab'.format(output_dir),
+        relatedness_df.to_csv('{}/{}.relatedness_class.tab'.format(output_dir,
+                                                                   self.name),
                               index=False, sep='\t')
         positional_df = self.positional.to_df()
         self._add_run_meta_data_to_df(positional_df)
-        positional_df.to_csv('{}/positional_class.tab'.format(output_dir),
+        positional_df.to_csv('{}/{}.positional_class.tab'.format(output_dir,
+                                                                 self.name),
                              index=False, sep='\t')
 
         # Combine segment DataFrames into a single data frame.
         segments_df = pandas.concat(self.segments_dfs)
         self._add_run_meta_data_to_df(segments_df)
-        segments_df.to_csv('{}/called_segments.tab'.format(output_dir),
+        segments_df.to_csv('{}/{}.called_segments.tab'.format(output_dir,
+                                                              self.name),
                            sep='\t', index=False)
 
 

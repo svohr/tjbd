@@ -7,6 +7,7 @@ individuals.
 """
 
 import sys
+import os
 import argparse
 import random
 import itertools
@@ -242,6 +243,8 @@ def main():
                         help="Set the seed for random numbers.")
     parser.add_argument("-t", "--trial-name", type=str, default='trial',
                         help="Set the name for this trial")
+    parser.add_argument("-o", "--out-dir", type=str, default='trial',
+                        help="Set the name of the output directory.")
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -268,8 +271,11 @@ def main():
                                                args.n_indv,
                                                args.segsize)
     res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, gpos, args)
-    # TODO: make this directory or provide a path to an output directory
-    res.dump(args.trial_name)
+
+    if not os.path.exists(args.out_dir):
+        os.makedirs(args.out_dir)
+    res.dump('{}'.format(args.out_dir))
+
     return 0
 
 
