@@ -6,6 +6,8 @@ with eachother, and runs a trial of the IBD detection HMM on all pairs of
 individuals.
 """
 
+from __future__ import print_function
+
 import sys
 import os
 import argparse
@@ -203,6 +205,20 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
     return results
 
 
+def write_trial_log(args):
+    """
+    Writes a log file containing all the parameters used in this trial.
+
+    Args:
+        args: The ArgumentParser namespace containing all options and values.
+    """
+    with open('{}/{}.log'.format(args.out_dir, args.trial_name),
+              'w') as log_out:
+        print(' '.join(sys.argv), file=log_out)
+        for name, value in vars(args).items():
+            print('{}: {}'.format(name, value), file=log_out)
+
+
 def main():
     """
     Runs a trial of the IBD HMM used by tjbd with the given parameters.
@@ -247,9 +263,12 @@ def main():
                         help="Set the name of the output directory.")
     args = parser.parse_args()
 
-    if args.seed is not None:
-        numpy.random.seed(args.seed)
-        random.seed(args.seed)
+    if args.seed is None:
+	args.seed = random.randrange(2**32 - 1)
+    numpy.random.seed(args.seed)
+    random.seed(args.seed)
+
+    write_trial_log(args)
 
     frqs = freqs.AlleleFreqs()
     with open(args.frq_fn, 'r') as frq_in:
@@ -275,7 +294,6 @@ def main():
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir)
     res.dump('{}'.format(args.out_dir))
-
     return 0
 
 
