@@ -209,7 +209,7 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
             called_ibd = ibd_hmm.find_ibd_blocks(hmm_post_probs,
                                                  args.max_run,
                                                  args.min_run,
-                                                 gpos,
+                                                 sub_gpos,
                                                  args.min_len)
             results.update(sub_pos,
                            sub_gpos,
