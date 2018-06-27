@@ -262,13 +262,14 @@ def main():
                         default=None, metavar="N",
                         help="Number of individuals to simulate (must be even "
                              "and <= number of haplotypes / 2)")
-    parser.add_argument("-m", dest="min_run", type=float, default=0.8,
+    parser.add_argument("-m", "--min-run", dest="min_run",
+                        type=float, default=0.8,
                         help="Minimum post. prob to allow in a detected "
                              "IBD segment.")
-    parser.add_argument("-M", dest="max_run", type=float,
+    parser.add_argument("-M", "--max-run", dest="max_run", type=float,
                         metavar="M", default=0.98,
                         help="Call IBD runs using post. probs exceeding M.")
-    parser.add_argument("-L", dest="min_len", type=float,
+    parser.add_argument("-L", "--min-len", dest="min_len", type=float,
                         metavar="cM", default=0.0,
                         help="Minimum length of IBD segment to call.")
     parser.add_argument("-r", "--seed", type=int, default=None,
