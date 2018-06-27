@@ -6,7 +6,7 @@ runs of tjbd.
 import numpy
 import pandas
 
-N_HIST_BINS = 500
+N_HIST_BINS = 200
 HIST_RANGE = (0.0, 1.0)
 
 

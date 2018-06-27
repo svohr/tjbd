@@ -98,7 +98,7 @@ def pick_ibd_block(gpos, segsize):
     return (gpos >= ibd_start) & (gpos < ibd_start + segsize)
 
 
-def sample_historical(indv_haps, indv, coverage):
+def sample_historical(indv_haps, indv, coverage, err_rate):
     """
     Simulates low-coverage sequencing of a historic individual. Produces
     a vector of observed bases and a mask indicating which positions were
@@ -108,16 +108,29 @@ def sample_historical(indv_haps, indv, coverage):
         indv_haps: numpy array of haplotypes.
         indv: ID for starting individual.
         coverage: amout of sequence coverage to simulate.
+        err_rate: rate of base call errors (switch obs to a random base)
     Returns:
         obs_mask: a vector of booleans indicating which positions were
                   observed.
         lo_obs: a vector containing a single observation for each observed
                 position.
     """
+    def base_error(orig_base):
+        '''
+        Simulate a base call error by picking a base at random that is not
+        the correct one.
+        '''
+        return random.choice([base for base in 'ACGT' if base != orig_base])
+
     obs_mask = numpy.random.poisson(coverage, indv_haps.shape[0]) == 1
     obs_chrm = numpy.random.choice([2 * indv, (2 * indv) + 1],
                                    indv_haps.shape[0])
     lo_obs = indv_haps[obs_mask, obs_chrm[obs_mask]]
+
+    if err_rate > 0:
+        error_pos = numpy.random.binomial(1, err_rate, lo_obs.shape[0]) == 1
+        lo_obs[error_pos] = numpy.fromiter(
+            (base_error(obs) for obs in lo_obs[error_pos]), dtype='c')
     return obs_mask, lo_obs
 
 
@@ -173,7 +186,8 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
                                       args.min_len))
     for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
-        sub_mask, lo_obs = sample_historical(indv_haps, lo_samp, args.coverage)
+        sub_mask, lo_obs = sample_historical(indv_haps, lo_samp,
+                                             args.coverage, args.error_rate)
         # mask remaining haplotypes.
         sub_haps = indv_haps[sub_mask, ]
         sub_pos = pos[sub_mask]
@@ -239,6 +253,8 @@ def main():
     parser.add_argument("-l", "--coverage", metavar="COVERAGE", default=0.01,
                         help="Sequencing coverage level to simulate for "
                              "low-coverage samples.")
+    parser.add_argument("-e", "--error-rate", metavar="RATE", default=0.005,
+                        help="Base call error rate for historical sample.")
     parser.add_argument("-s", "--seg-size", dest="segsize", type=float,
                         default=10.0, metavar="cM",
                         help="Size in cM of IBD segments to simulate")
@@ -264,7 +280,7 @@ def main():
     args = parser.parse_args()
 
     if args.seed is None:
-	args.seed = random.randrange(2**32 - 1)
+        args.seed = random.randrange(2**32 - 1)
     numpy.random.seed(args.seed)
     random.seed(args.seed)
 
