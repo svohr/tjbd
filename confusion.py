@@ -49,6 +49,8 @@ class TrialResults(object):
         segment_dfs: a list of pandas DataFrames storing the length and
                      fraction overlapping a true IBD state for all called
                      IBD segments.
+        pair_results: a list of pandas Series describe the results for
+                      comparisons of pairs.
     """
 
     def __init__(self, name=None, ibd_seg_size=None,
@@ -70,6 +72,7 @@ class TrialResults(object):
         self.relatedness = ConfusionTable()
         self.positional = ConfusionTable()
         self.segments_dfs = []
+        self.pair_results = []
 
     def update(self, pos, gpos, post_prob, ibd_segs, called_segs):
         """
@@ -101,9 +104,62 @@ class TrialResults(object):
             self.post_prob_hist_norel += numpy.histogram(post_prob,
                                                          bins=N_HIST_BINS,
                                                          range=HIST_RANGE)[0]
-
+        self._update_pair_results(pos, gpos, post_prob, ibd_segs, called_segs)
         if called_segs.any():
             self._update_segments(pos, gpos, ibd_segs, called_segs)
+
+    def _update_pair_results(self, pos, gpos, post_prob, ibd_segs, called_segs):
+        """
+        Helper function for reporting pair comparison results. Report
+        the following information for a single pair comparison:
+          1. Pair shares IBD (True/False)
+          2. Detected IBD (True/False)
+          3. Number of segments detected
+          4. True IBD in base pairs
+          5. True IBD in cM
+          6. Detected IBD in base pairs
+          7. Detected IBD in cM
+          8. Maximum post probability
+
+        Args:
+            pos: array containing physical positions for each marker
+            post_prob: array of HMM posterior probabilities
+            ibd_segs: array of booleans indicating true IBD state (true=IBD)
+            called_segs: array of booleans indicating called IBD state
+        """
+        called_ibd_bp = 0
+        called_ibd_cm = 0.0
+        true_ibd_bp = 0
+        true_ibd_cm = 0.0
+        called_ibd_intervals = get_segment_intervals(called_segs)
+        for start, end in called_ibd_intervals:
+            called_ibd_bp += pos[end] - pos[start] + 1
+            called_ibd_cm += gpos[end] - gpos[start]
+        for start, end in get_segment_intervals(ibd_segs):
+            true_ibd_bp += pos[end] - pos[start] + 1
+            true_ibd_cm  += gpos[end] - gpos[start]
+
+        pair_comp = pandas.Series([ibd_segs.any(),
+                                   called_segs.any(),
+                                   len(called_ibd_intervals),
+                                   true_ibd_bp,
+                                   true_ibd_cm,
+                                   called_ibd_bp,
+                                   called_ibd_cm,
+                                   post_prob.max()],
+                                  index=['shared_IBD',
+                                         'called_IBD',
+                                         'num_called_segments',
+                                         'true_ibd_bp',
+                                         'true_ibd_cm',
+                                         'called_ibd_bp',
+                                         'called_ibd_cm',
+                                         'max_post_prob'])
+        pair_comp['max_post_prob_ibd'] = (0 if not ibd_segs.any()
+                                            else post_prob[ibd_segs].max())
+        pair_comp['max_post_prob_noibd'] = post_prob[~ibd_segs].max()
+
+        self.pair_results.append(pair_comp)
 
     def _update_segments(self, pos, gpos, ibd_segs, called_segs):
         """
@@ -197,6 +253,11 @@ class TrialResults(object):
         segments_df.to_csv('{}/{}.called_segments.tab'.format(output_dir,
                                                               self.name),
                            sep='\t', index=False)
+
+        pair_df = pandas.concat(self.pair_results, axis=1).T
+        self._add_run_meta_data_to_df(pair_df)
+        pair_df.to_csv('{}/{}.pairs.tab'.format(output_dir, self.name),
+                       sep='\t', index=False)
 
 
 class ConfusionTable(object):
