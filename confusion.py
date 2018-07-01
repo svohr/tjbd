@@ -129,13 +129,17 @@ class TrialResults(object):
         """
         called_ibd_bp = 0
         called_ibd_cm = 0.0
+        called_ibd_snp = 0
         true_ibd_bp = 0
         true_ibd_cm = 0.0
+        true_ibd_snp = 0
         called_ibd_intervals = get_segment_intervals(called_segs)
         for start, end in called_ibd_intervals:
+            called_ibd_snp += end - start + 1
             called_ibd_bp += pos[end] - pos[start] + 1
             called_ibd_cm += gpos[end] - gpos[start]
         for start, end in get_segment_intervals(ibd_segs):
+            true_ibd_snp += end - start + 1
             true_ibd_bp += pos[end] - pos[start] + 1
             true_ibd_cm  += gpos[end] - gpos[start]
 
@@ -144,16 +148,20 @@ class TrialResults(object):
                                    len(called_ibd_intervals),
                                    true_ibd_bp,
                                    true_ibd_cm,
+                                   true_ibd_snp,
                                    called_ibd_bp,
                                    called_ibd_cm,
+                                   called_ibd_snp,
                                    post_prob.max()],
                                   index=['shared_IBD',
                                          'called_IBD',
                                          'num_called_segments',
                                          'true_ibd_bp',
                                          'true_ibd_cm',
+                                         'true_ibd_snp',
                                          'called_ibd_bp',
                                          'called_ibd_cm',
+                                         'called_ibd_snp',
                                          'max_post_prob'])
         pair_comp['max_post_prob_ibd'] = (0 if not ibd_segs.any()
                                             else post_prob[ibd_segs].max())
