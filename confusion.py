@@ -236,11 +236,32 @@ class TrialResults(object):
              'noibd_count': self.post_prob_hist_noibd,
              'rel_count': self.post_prob_hist_rel,
              'norel_count': self.post_prob_hist_norel})
+        post_prob_df['true_positives'] = post_prob_df['ibd_count'][::-1].cumsum()[::-1]
+        post_prob_df['false_positives'] = post_prob_df['noibd_count'][::-1].cumsum()[::-1]
+        post_prob_df['false_negatives'] = (post_prob_df['ibd_count'].sum()
+                                           - post_prob_df['true_positives'])
+        post_prob_df['true_negatives'] = (post_prob_df['noibd_count'].sum()
+                                          - post_prob_df['false_positives'])
+        post_prob_df['sensitivity'] = (post_prob_df['true_positives']
+                                       / (post_prob_df['true_positives']
+                                          + post_prob_df['false_negatives']))
+        post_prob_df['false_positive_rate'] = (
+            post_prob_df['false_positives']
+            / (post_prob_df['false_positives'] + post_prob_df['true_negatives'])
+            )
+        post_prob_df['false_discovery_rate'] = (
+            post_prob_df['false_positives']
+            / (post_prob_df['false_positives'] + post_prob_df['true_positives'])
+            )
         post_prob_df.to_csv(
             '{}/{}.posterior_probs_histogram.tab'.format(output_dir, self.name),
             columns=['bin_start', 'bin_end',
                      'ibd_count', 'noibd_count',
-                     'rel_count', 'norel_count'],
+                     'rel_count', 'norel_count',
+                     'true_positives', 'true_negatives',
+                     'false_positives', 'false_negatives',
+                     'sensitivity', 'false_positive_rate',
+                     'false_discovery_rate'],
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
