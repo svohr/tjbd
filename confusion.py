@@ -6,7 +6,7 @@ runs of tjbd.
 import numpy
 import pandas
 
-N_HIST_BINS = 200
+N_HIST_BINS = 250
 HIST_RANGE = (0.0, 1.0)
 
 
@@ -141,7 +141,7 @@ class TrialResults(object):
         for start, end in get_segment_intervals(ibd_segs):
             true_ibd_snp += end - start + 1
             true_ibd_bp += pos[end] - pos[start] + 1
-            true_ibd_cm  += gpos[end] - gpos[start]
+            true_ibd_cm += gpos[end] - gpos[start]
 
         pair_comp = pandas.Series([ibd_segs.any(),
                                    called_segs.any(),
@@ -228,6 +228,12 @@ class TrialResults(object):
         Args:
             output_dir: path to directory to write table to.
         """
+        # Make a DataFrame for pair comparison results.
+        pair_df = pandas.concat(self.pair_results, axis=1).T
+        self._add_run_meta_data_to_df(pair_df)
+        pair_df.to_csv('{}/{}.pairs.tab'.format(output_dir, self.name),
+                       sep='\t', index=False)
+
         # Make a DataFrame for posterior probabilities.
         post_prob_df = pandas.DataFrame(
             {'bin_start': self.post_prob_hist_breaks[:-1],
@@ -236,32 +242,66 @@ class TrialResults(object):
              'noibd_count': self.post_prob_hist_noibd,
              'rel_count': self.post_prob_hist_rel,
              'norel_count': self.post_prob_hist_norel})
-        post_prob_df['true_positives'] = post_prob_df['ibd_count'][::-1].cumsum()[::-1]
-        post_prob_df['false_positives'] = post_prob_df['noibd_count'][::-1].cumsum()[::-1]
-        post_prob_df['false_negatives'] = (post_prob_df['ibd_count'].sum()
-                                           - post_prob_df['true_positives'])
-        post_prob_df['true_negatives'] = (post_prob_df['noibd_count'].sum()
-                                          - post_prob_df['false_positives'])
-        post_prob_df['sensitivity'] = (post_prob_df['true_positives']
-                                       / (post_prob_df['true_positives']
-                                          + post_prob_df['false_negatives']))
-        post_prob_df['false_positive_rate'] = (
-            post_prob_df['false_positives']
-            / (post_prob_df['false_positives'] + post_prob_df['true_negatives'])
+
+        # sweep through post probs for pair relatedness calls.
+        max_post_prob_ibd = numpy.histogram(
+            pair_df.loc[pair_df['shared_IBD'], 'max_post_prob'],
+            bins=N_HIST_BINS,
+            range=HIST_RANGE)[0]
+        max_post_prob_noibd = numpy.histogram(
+            pair_df.loc[~pair_df['shared_IBD'], 'max_post_prob'],
+            bins=N_HIST_BINS,
+            range=HIST_RANGE)[0]
+        post_prob_df['rel_tp'] = max_post_prob_ibd[::-1].cumsum()[::-1]
+        post_prob_df['rel_fp'] = max_post_prob_noibd[::-1].cumsum()[::-1]
+        post_prob_df['rel_fn'] = (max_post_prob_ibd.sum()
+                                  - post_prob_df['rel_tp'])
+        post_prob_df['rel_tn'] = (max_post_prob_noibd.sum()
+                                  - post_prob_df['rel_fp'])
+        post_prob_df['rel_sensitivity'] = (post_prob_df['rel_tp']
+                                           / (post_prob_df['rel_tp']
+                                              + post_prob_df['rel_fn']))
+        post_prob_df['rel_false_positive_rate'] = (
+            post_prob_df['rel_fp']
+            / (post_prob_df['rel_fp'] + post_prob_df['rel_tn'])
             )
-        post_prob_df['false_discovery_rate'] = (
-            post_prob_df['false_positives']
-            / (post_prob_df['false_positives'] + post_prob_df['true_positives'])
+        post_prob_df['rel_false_discovery_rate'] = (
+            post_prob_df['rel_fp']
+            / (post_prob_df['rel_fp'] + post_prob_df['rel_tp'])
             )
+
+        # sweep through post probs for positional IBD calls.
+        post_prob_df['pos_tp'] = post_prob_df['ibd_count'][::-1].cumsum()[::-1]
+        post_prob_df['pos_fp'] = post_prob_df['noibd_count'][::-1].cumsum()[::-1]
+        post_prob_df['pos_fn'] = (post_prob_df['ibd_count'].sum()
+                                           - post_prob_df['pos_tp'])
+        post_prob_df['pos_tn'] = (post_prob_df['noibd_count'].sum()
+                                          - post_prob_df['pos_fp'])
+        post_prob_df['pos_sensitivity'] = (post_prob_df['pos_tp']
+                                           / (post_prob_df['pos_tp']
+                                              + post_prob_df['pos_fn']))
+        post_prob_df['pos_false_positive_rate'] = (
+            post_prob_df['pos_fp']
+            / (post_prob_df['pos_fp'] + post_prob_df['pos_tn'])
+            )
+        post_prob_df['pos_false_discovery_rate'] = (
+            post_prob_df['pos_fp']
+            / (post_prob_df['pos_fp'] + post_prob_df['pos_tp'])
+            )
+
         post_prob_df.to_csv(
             '{}/{}.posterior_probs_histogram.tab'.format(output_dir, self.name),
             columns=['bin_start', 'bin_end',
                      'ibd_count', 'noibd_count',
                      'rel_count', 'norel_count',
-                     'true_positives', 'true_negatives',
-                     'false_positives', 'false_negatives',
-                     'sensitivity', 'false_positive_rate',
-                     'false_discovery_rate'],
+                     'rel_tp', 'rel_tn',
+                     'rel_fp', 'rel_fn',
+                     'rel_sensitivity', 'rel_false_positive_rate',
+                     'rel_false_discovery_rate',
+                     'pos_tp', 'pos_tn',
+                     'pos_fp', 'pos_fn',
+                     'pos_sensitivity', 'pos_false_positive_rate',
+                     'pos_false_discovery_rate'],
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
@@ -282,11 +322,6 @@ class TrialResults(object):
         segments_df.to_csv('{}/{}.called_segments.tab'.format(output_dir,
                                                               self.name),
                            sep='\t', index=False)
-
-        pair_df = pandas.concat(self.pair_results, axis=1).T
-        self._add_run_meta_data_to_df(pair_df)
-        pair_df.to_csv('{}/{}.pairs.tab'.format(output_dir, self.name),
-                       sep='\t', index=False)
 
 
 class ConfusionTable(object):
