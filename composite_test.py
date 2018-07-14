@@ -170,20 +170,13 @@ def get_frequencies(frqs, chrm, pos, obs):
                         for p, b in itertools.izip(pos, obs)])
 
 
-def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args):
+def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args, results):
     """
     Runs the IBD HMM on all permuations of individuals. A low-coverage sample
     is generated for each individual and compared against the full genotypes
     of all other individuals.
     """
     n_indv = indv_haps.shape[1] / 2
-    results = confusion.TrialResults(args.trial_name,
-                                     args.segsize,
-                                     args.coverage,
-                                     args.ngen,
-                                     (args.min_run,
-                                      args.max_run,
-                                      args.min_len))
     for lo_samp in xrange(0, n_indv):
         # generate low-coverage.
         sub_mask, lo_obs = sample_historical(indv_haps, lo_samp,
@@ -274,6 +267,8 @@ def main():
                         help="Minimum length of IBD segment to call.")
     parser.add_argument("-r", "--seed", type=int, default=None,
                         help="Set the seed for random numbers.")
+    parser.add_argument("-R", "--reps", type=int, default=None,
+                        help="Set number of types to repeat in trial.")
     parser.add_argument("-t", "--trial-name", type=str, default='trial',
                         help="Set the name for this trial")
     parser.add_argument("-o", "--out-dir", type=str, default='trial',
@@ -302,15 +297,24 @@ def main():
     if not args.n_indv or args.n_indv * 2 > init_haps.shape[1]:
         args.n_indv = init_haps.shape[1] / 2 / 2 * 2
 
-    indv_haps, indv_ibd = generate_individuals(gpos,
-                                               init_haps,
-                                               args.n_indv,
-                                               args.segsize)
-    res = run_trial(rmap, frqs, indv_haps, indv_ibd, pos, gpos, args)
+    results = confusion.TrialResults(args.trial_name,
+                                     args.segsize,
+                                     args.coverage,
+                                     args.ngen,
+                                     (args.min_run,
+                                      args.max_run,
+                                      args.min_len))
+
+    for _ in xrange(args.reps):
+        indv_haps, indv_ibd = generate_individuals(gpos,
+                                                   init_haps,
+                                                   args.n_indv,
+                                                   args.segsize)
+        run_trial(rmap, frqs, indv_haps, indv_ibd, pos, gpos, args, results)
 
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir)
-    res.dump('{}'.format(args.out_dir))
+    results.dump('{}'.format(args.out_dir))
     return 0
 
 
