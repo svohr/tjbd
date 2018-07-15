@@ -267,7 +267,7 @@ def main():
                         help="Minimum length of IBD segment to call.")
     parser.add_argument("-r", "--seed", type=int, default=None,
                         help="Set the seed for random numbers.")
-    parser.add_argument("-R", "--reps", type=int, default=None,
+    parser.add_argument("-R", "--reps", type=int, default=1,
                         help="Set number of types to repeat in trial.")
     parser.add_argument("-t", "--trial-name", type=str, default='trial',
                         help="Set the name for this trial")
