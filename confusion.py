@@ -258,9 +258,10 @@ class TrialResults(object):
                                   - post_prob_df['rel_tp'])
         post_prob_df['rel_tn'] = (max_post_prob_noibd.sum()
                                   - post_prob_df['rel_fp'])
-        post_prob_df['rel_sensitivity'] = (post_prob_df['rel_tp']
-                                           / (post_prob_df['rel_tp']
-                                              + post_prob_df['rel_fn']))
+        post_prob_df['rel_sensitivity'] = (
+            post_prob_df['rel_tp']
+            / (post_prob_df['rel_tp'] + post_prob_df['rel_fn'])
+            )
         post_prob_df['rel_false_positive_rate'] = (
             post_prob_df['rel_fp']
             / (post_prob_df['rel_fp'] + post_prob_df['rel_tn'])
@@ -277,9 +278,10 @@ class TrialResults(object):
                                            - post_prob_df['pos_tp'])
         post_prob_df['pos_tn'] = (post_prob_df['noibd_count'].sum()
                                           - post_prob_df['pos_fp'])
-        post_prob_df['pos_sensitivity'] = (post_prob_df['pos_tp']
-                                           / (post_prob_df['pos_tp']
-                                              + post_prob_df['pos_fn']))
+        post_prob_df['pos_sensitivity'] = (
+            post_prob_df['pos_tp']
+            / (post_prob_df['pos_tp'] + post_prob_df['pos_fn'])
+            )
         post_prob_df['pos_false_positive_rate'] = (
             post_prob_df['pos_fp']
             / (post_prob_df['pos_fp'] + post_prob_df['pos_tn'])
@@ -289,6 +291,7 @@ class TrialResults(object):
             / (post_prob_df['pos_fp'] + post_prob_df['pos_tp'])
             )
 
+        self._add_run_meta_data_to_df(post_prob_df)
         post_prob_df.to_csv(
             '{}/{}.posterior_probs_histogram.tab'.format(output_dir, self.name),
             columns=['bin_start', 'bin_end',
@@ -301,7 +304,8 @@ class TrialResults(object):
                      'pos_tp', 'pos_tn',
                      'pos_fp', 'pos_fn',
                      'pos_sensitivity', 'pos_false_positive_rate',
-                     'pos_false_discovery_rate'],
+                     'pos_false_discovery_rate',
+                     'trial_name', 'ibd_seg_size', 'coverage', 'n_gens'],
             sep='\t', index=False)
 
         # Write table for positional accuracy and relatedness detection.
