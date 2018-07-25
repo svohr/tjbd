@@ -127,7 +127,7 @@ def sample_historical(indv_haps, indv, coverage, err_rate):
                                    indv_haps.shape[0])
     lo_obs = indv_haps[obs_mask, obs_chrm[obs_mask]]
 
-    if err_rate > 0:
+    if err_rate > 0.0:
         error_pos = numpy.random.binomial(1, err_rate, lo_obs.shape[0]) == 1
         lo_obs[error_pos] = numpy.fromiter(
             (base_error(obs) for obs in lo_obs[error_pos]), dtype='c')
@@ -247,6 +247,7 @@ def main():
                         help="Sequencing coverage level to simulate for "
                              "low-coverage samples.")
     parser.add_argument("-e", "--error-rate", metavar="RATE", default=0.005,
+                        type=float,
                         help="Base call error rate for historical sample.")
     parser.add_argument("-s", "--seg-size", dest="segsize", type=float,
                         default=10.0, metavar="cM",
