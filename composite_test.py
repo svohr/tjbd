@@ -16,6 +16,7 @@ import itertools
 import collections
 
 import numpy
+import pandas
 
 import recmap
 import freqs
@@ -41,7 +42,7 @@ def read_composites(cmp_in):
     haps = list()
 
     for line in cmp_in:
-        items = line.split('\t')
+        items = line.rstrip().split('\t')
         pos.append(int(items[1]))
         gpos.append(float(items[2]))
         haps.append(items[3:])
@@ -209,7 +210,33 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args, results):
                            hmm_post_probs,
                            ibd_blocks[lo_samp, hi_samp][sub_mask],
                            called_ibd)
+
     return results
+
+
+def dump_comp(args, sub_pos, sub_gpos, hi_samp, lo_samp, sub_haps, lo_obs,
+              hmm_observed, lo_freq, ibd_trs, noibd_trs, post_prob,
+              true_ibd, called_ibd):
+    """
+    write out a table for a single comparison result.
+    """
+    out_df = pandas.DataFrame()
+    out_df['sub_pos'] = sub_pos
+    out_df['sub_gpos'] = sub_gpos
+    out_df['sub_haps'] = map(''.join, zip(sub_haps[:, (hi_samp * 2)],
+                                          sub_haps[:, (hi_samp * 2) + 1]))
+    out_df['lo_obs'] = lo_obs
+    out_df['hmm_observed'] = hmm_observed
+    out_df['lo_freq'] = lo_freq
+    out_df['ibd_trs'] = ibd_trs
+    out_df['noibd_trs'] = noibd_trs
+    out_df['post_prob'] = post_prob
+    out_df['true_ibd'] = true_ibd
+    out_df['called_ibd'] = called_ibd
+
+    out_df.to_csv('{}/comparison_{}_{}.tab'.format(args.out_dir,
+                                                   lo_samp, hi_samp),
+                  index=False, sep='\t')
 
 
 def write_trial_log(args):
