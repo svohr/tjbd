@@ -7,15 +7,33 @@ pair obserations are made from sparse coverage.
 
 import argparse
 import numpy
+import pandas
 import sys
 
 
-def make_obs_from_pileup(pileup_in):
+def make_obs_from_pileup(bamfile_in, chrom, obs_pos, min_mq, min_bq):
     '''
     Make an array of observed bases from pileup format input.
     '''
-    # TODO: this
-    pass
+    # pileup coords are 1-based, but these are 0-based.
+    pileup_iter = bamfile_in.pileup(chrom)
+
+    obs_pos_base = []
+    pos_set = set(obs_pos)
+    for col in pileup_iter:
+        if col.reference_pos not in pos_set or col.nsegments > 1:
+            next
+        map_quals = col.get_mapping_qualities()
+        base_quals = col.get_query_qualities()
+        if map_quals[0] < min_mq or base_quals[0] < min_bq:
+            next
+        base = col.get_query_sequences()[0].upper()
+        if base in 'ACGT':
+            obs_pos_base.append((col.reference_pos, base))
+
+    low_obs_df = pandas.DataFrame(obs_pos_base, columns=['pos', 'base'])
+    low_obs_df.set_index('pos', inplace=True)
+    return low_obs_df
 
 
 def make_genotypes_from_vcf(vcf_in, include_indvs, exclude_indvs):
