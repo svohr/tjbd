@@ -67,6 +67,10 @@ def make_genotypes_from_vcf(vcf_in, include_indvs, exclude_indvs):
     return numpy.array(obs_pos), numpy.array(genotypes)
 
 
+def encode_hmm_input(low_obs_df, hi_geno_df, rec_map, freqs):
+    pass
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("vcf_fn", metavar="file.vcf", type=str,
