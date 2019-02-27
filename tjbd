@@ -6,13 +6,47 @@ pair obserations are made from sparse coverage.
 '''
 
 import argparse
+import numpy
+import sys
 
 
-def make_obs_from_pu(pileup_in):
+def make_obs_from_pileup(pileup_in):
     '''
     Make an array of observed bases from pileup format input.
     '''
+    # TODO: this
     pass
+
+
+def make_genotypes_from_vcf(vcf_in, include_indvs, exclude_indvs):
+    """
+    Makes a matrix of genotypes from a VCF file.
+
+    Args:
+        vcf_in: VCF file input for the chromosome of interest.
+        include_indvs: list of individuals to include.
+        exclude_indvs: list of individuals to exclude.
+    Returns:
+        positions: A vector of chromosome positions where an observation
+                   was made.
+        genotypes: matrix of genotypes, one column per individual,
+                   one row per site.
+    """
+    # TODO: consider storing genotypes as low-coverage sample match counts.
+    pos = list()
+    genotypes = list()
+    # TODO: get all individuals filter for includes, remove excludes.
+    for rec in vcf_in:
+        pos.append(rec.pos)
+        pos_genotypes = []
+        for indv in indvs:
+            _ = rec.alts # this avoids a segfault
+            geno = rec.samples[indv]['GT']
+            pos_genotypes.append(geno)
+            # TODO: may need to deal with empty observations here some how.
+        genotypes.append(tuple(pos_genotypes))
+    # TODO: see if we can name the columns per individual
+    return numpy.array(obs_pos), numpy.array(genotypes)
 
 
 def main():
@@ -27,6 +61,8 @@ def main():
                         help="Genetic distances in tab file.")
     parser.add_argument("-c", "--chrom", metavar="CHROM", type=str, default=1,
                         help="Chromosome ID")
+    parser.add_argument("-q", "--base-quality", metavar="N", type=int,
+                        default=30, help="Minimum base quality.")
     parser.add_argument("-g", "--gen", metavar="N", dest="ngen",
                         type=int, default=5,
                         help="Approximate number of generations between "
@@ -45,8 +81,16 @@ def main():
                         help="Set the name of the output directory.")
     args = parser.parse_args()
 
-    pass
+    frqs = freqs.AlleleFreqs()
+    with open(args.frq_fn, 'r') as frq_in:
+        frqs.read_vcf_counts(frq_in)
+
+    rmap = recmap.RecMap()
+    with open(args.rec_fn, 'r') as rec_in:
+        rmap.read_tab(rec_in)
+
+    return 0
 
 
 if __name__ == '__main__':
-    return main()
+    sys.exit(main())
