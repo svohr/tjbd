@@ -9,11 +9,22 @@ import argparse
 import numpy
 import pandas
 import sys
+import pysam
 
 
 def make_obs_from_pileup(bamfile_in, chrom, obs_pos, min_mq, min_bq):
     '''
-    Make an array of observed bases from pileup format input.
+    Make a DataFrame of observed bases from pileup format input.
+
+    Args:
+        bamfile_in: Sequences aligned to a reference sequence.
+        chrom: Chromosome of interest.
+        obs_pos: Positions of interest at which to make observations.
+        min_mq: Minimum mapping quality required to make a base observation.
+        min_mq: Minimum base quality required to make a base observation.
+    Returns:
+        A pandas DataFrame containing a single base observed from each site
+        in obs_pos (when possible) indexed by position.
     '''
     # pileup coords are 1-based, but these are 0-based.
     pileup_iter = bamfile_in.pileup(chrom)
@@ -21,12 +32,16 @@ def make_obs_from_pileup(bamfile_in, chrom, obs_pos, min_mq, min_bq):
     obs_pos_base = []
     pos_set = set(obs_pos)
     for col in pileup_iter:
-        if col.reference_pos not in pos_set or col.nsegments > 1:
-            next
+        if col.reference_pos not in pos_set or col.nsegments != 1:
+            continue
+
         map_quals = col.get_mapping_qualities()
+        if not map_quals or map_quals[0] < min_mq:
+            continue
         base_quals = col.get_query_qualities()
-        if map_quals[0] < min_mq or base_quals[0] < min_bq:
-            next
+        if not base_quals or base_quals[0] < min_bq:
+            continue
+
         base = col.get_query_sequences()[0].upper()
         if base in 'ACGT':
             obs_pos_base.append((col.reference_pos, base))
@@ -36,35 +51,30 @@ def make_obs_from_pileup(bamfile_in, chrom, obs_pos, min_mq, min_bq):
     return low_obs_df
 
 
-def make_genotypes_from_vcf(vcf_in, include_indvs, exclude_indvs):
+def make_genotypes_for_indv_from_vcf(vcf_in, indv):
     """
-    Makes a matrix of genotypes from a VCF file.
+    Makes a DataFrame of genotypes for a single individual from a VCF file.
 
     Args:
         vcf_in: VCF file input for the chromosome of interest.
-        include_indvs: list of individuals to include.
-        exclude_indvs: list of individuals to exclude.
+        indv: ID of the individual of interest.
     Returns:
-        positions: A vector of chromosome positions where an observation
-                   was made.
-        genotypes: matrix of genotypes, one column per individual,
-                   one row per site.
+        A pandas DataFrame containing genotype base tuples index by position
     """
-    # TODO: consider storing genotypes as low-coverage sample match counts.
-    pos = list()
-    genotypes = list()
-    # TODO: get all individuals filter for includes, remove excludes.
+    pos = []
+    genotypes = []
     for rec in vcf_in:
+        geno = rec.samples[indv]['GT']
+
+        if any(g is None for g in geno):
+            continue
+
         pos.append(rec.pos)
-        pos_genotypes = []
-        for indv in indvs:
-            _ = rec.alts # this avoids a segfault
-            geno = rec.samples[indv]['GT']
-            pos_genotypes.append(geno)
-            # TODO: may need to deal with empty observations here some how.
-        genotypes.append(tuple(pos_genotypes))
-    # TODO: see if we can name the columns per individual
-    return numpy.array(obs_pos), numpy.array(genotypes)
+        genotypes.append(tuple(rec.alleles[g] for g in geno))
+
+    hi_geno_df = pandas.DataFrame({'pos': pos, 'genotype':genotypes})
+    hi_geno_df.set_index('pos', inplace=True)
+    return hi_geno_df
 
 
 def encode_hmm_input(low_obs_df, hi_geno_df, rec_map, freqs):
@@ -73,18 +83,23 @@ def encode_hmm_input(low_obs_df, hi_geno_df, rec_map, freqs):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("chrom", metavar="CHROM", type=str, default="1",
+                        help="Chromosome ID")
+    parser.add_argument("bam_fn", metavar="file.bam", type=str,
+                        help="BAM file containing aligned reads from "
+                             "historical individual.")
     parser.add_argument("vcf_fn", metavar="file.vcf", type=str,
                         help="VCF file containing modern individual(s).")
-    parser.add_argument("pu_fn", metavar="file.pileup", type=str,
-                        help="Pileup file of low-coverage base observations.")
     parser.add_argument("frq_fn", metavar="frqs.count", type=str,
                         help="Allele counts by SNP site")
     parser.add_argument("rec_fn", metavar="recmap.tab", type=str,
                         help="Genetic distances in tab file.")
-    parser.add_argument("-c", "--chrom", metavar="CHROM", type=str, default=1,
-                        help="Chromosome ID")
-    parser.add_argument("-q", "--base-quality", metavar="N", type=int,
-                        default=30, help="Minimum base quality.")
+    parser.add_argument("-i", "--indv", metavar="ID",
+                        help="Individual in VCF to test.")
+    parser.add_argument("-q", "--map-quality", dest='min_mq', metavar="N",
+                        type=int, default=30, help="Minimum mapping quality.")
+    parser.add_argument("-Q", "--base-quality", dest='min_bq', metavar="N",
+                        type=int, default=30, help="Minimum base quality.")
     parser.add_argument("-g", "--gen", metavar="N", dest="ngen",
                         type=int, default=5,
                         help="Approximate number of generations between "
@@ -111,6 +126,15 @@ def main():
     with open(args.rec_fn, 'r') as rec_in:
         rmap.read_tab(rec_in)
 
+    with pysam.VariantFile(args.vcf_fn) as vcf_in:
+        hi_geno_df = make_genotypes_for_indv_from_vcf(vcf_in, args.indv)
+
+    with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
+        print(make_obs_from_pileup(bam_in,
+                                   args.chrom,
+                                   hi_geno_df.index,
+                                   args.min_mq,
+                                   args.min_bq))
     return 0
 
 
