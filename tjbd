@@ -77,8 +77,10 @@ def make_genotypes_for_indv_from_vcf(vcf_in, indv):
     return hi_geno_df
 
 
-def encode_hmm_input(low_obs_df, hi_geno_df, rec_map, freqs):
-    pass
+def encode_hmm_input(chrom, low_obs_df, hi_geno_df, rec_map, freqs):
+
+    gpos = low_obs_df.index.map(lamba x: rec_map.position(chrom, x))
+
 
 
 def main():

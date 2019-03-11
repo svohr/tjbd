@@ -72,7 +72,7 @@ def write_composites(out, vcf_rec, gpos, compo_src):
     """
     out.write("%s\t%d\t%f" % (vcf_rec.chrom, vcf_rec.pos, gpos))
     for _, src in enumerate(compo_src):
-        out.write("\t%s\t%s" % vcf_rec.samples[src]["GT"])
+        out.write("\t%s\t%s" % tuple([vcf_rec.alleles[gt] for gt in vcf_rec.samples[src]["GT"]]))
     out.write("\n")
     return
 
