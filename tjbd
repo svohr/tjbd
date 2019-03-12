@@ -5,14 +5,19 @@ with complete genotype calls and a low-coverage genome where single base
 pair obserations are made from sparse coverage.
 '''
 
+from __future__ import print_function, division
 import argparse
 import numpy
 import pandas
 import sys
 import pysam
 
+import freqs
+import recmap
+import ibd_hmm
 
-def make_obs_from_pileup(bamfile_in, chrom, obs_pos, min_mq, min_bq):
+
+def make_obs_from_pileup(bamfile_in, obs_pos, args):
     '''
     Make a DataFrame of observed bases from pileup format input.
 
@@ -27,7 +32,7 @@ def make_obs_from_pileup(bamfile_in, chrom, obs_pos, min_mq, min_bq):
         in obs_pos (when possible) indexed by position.
     '''
     # pileup coords are 1-based, but these are 0-based.
-    pileup_iter = bamfile_in.pileup(chrom)
+    pileup_iter = bamfile_in.pileup(args.chrom)
 
     obs_pos_base = []
     pos_set = set(obs_pos)
@@ -36,10 +41,10 @@ def make_obs_from_pileup(bamfile_in, chrom, obs_pos, min_mq, min_bq):
             continue
 
         map_quals = col.get_mapping_qualities()
-        if not map_quals or map_quals[0] < min_mq:
+        if not map_quals or map_quals[0] < args.min_mq:
             continue
         base_quals = col.get_query_qualities()
-        if not base_quals or base_quals[0] < min_bq:
+        if not base_quals or base_quals[0] < args.min_bq:
             continue
 
         base = col.get_query_sequences()[0].upper()
@@ -77,10 +82,16 @@ def make_genotypes_for_indv_from_vcf(vcf_in, indv):
     return hi_geno_df
 
 
-def encode_hmm_input(chrom, low_obs_df, hi_geno_df, rec_map, freqs):
+def encode_hmm_input(args, low_obs_df, hi_geno_df, rec_map, freqs):
 
-    gpos = low_obs_df.index.map(lamba x: rec_map.position(chrom, x))
-
+    genotype_bases = hi_geno_df.loc[low_obs_df.index, 'genotype'].apply(pandas.Series)
+    hmm_observed = genotype_bases.eq(low_obs_df['base'], axis=0).sum(axis=1).values
+    lo_freq = None
+    trans_probs = ibd_hmm.state_trans(rec=rec_map,
+                                      gens=args.ngen,
+                                      chrm=args.chrom,
+                                      positions=low_obs_df.index)
+    return hmm_observed, trans_probs, lo_freq
 
 
 def main():
@@ -132,11 +143,11 @@ def main():
         hi_geno_df = make_genotypes_for_indv_from_vcf(vcf_in, args.indv)
 
     with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
-        print(make_obs_from_pileup(bam_in,
-                                   args.chrom,
-                                   hi_geno_df.index,
-                                   args.min_mq,
-                                   args.min_bq))
+        low_obs_df = make_obs_from_pileup(bam_in, hi_geno_df.index, args)
+
+    print('Observed {}/{} SNPs'.format(low_obs_df.shape[0], hi_geno_df.shape[0]))
+
+    print(hi_geno_df)
     return 0
 
 
