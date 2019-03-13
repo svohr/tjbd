@@ -6,10 +6,11 @@ pair obserations are made from sparse coverage.
 '''
 
 from __future__ import print_function, division
+import sys
 import argparse
+
 import numpy
 import pandas
-import sys
 import pysam
 
 import freqs
@@ -82,16 +83,95 @@ def make_genotypes_for_indv_from_vcf(vcf_in, indv):
     return hi_geno_df
 
 
-def encode_hmm_input(args, low_obs_df, hi_geno_df, rec_map, freqs):
+def encode_hmm_input(args, low_obs_df, hi_geno_df, rec_map, frqs):
+    """
+    Makes the input for the IBD HMM.
 
+    Args:
+        args: namespace containing the optional arguments
+        low_obs_df: DataFrame of low coverage base observations from
+                    historical individual indexed by position.
+        hi_geno_df: DataFrame of genotypes from high coverage, modern
+                    individual indexed by position.
+        rec_map: A recombination map.
+        frqs: A set of allele frequencies.
+    Returns:
+        hmm_observed: Number of matches with the historical base found in the
+                      modern individual (0, 1, 2) for each position
+                      (numpy array)
+        hmm_trs_probs: Tuple of two numpy arrays containing the transition
+                       probabilities of remaining in the ibd and no-ibd states.
+        hmm_low_freqs: The frequency in the reference population of the base
+                       observed in the low coverage, historical individual.
+    """
     genotype_bases = hi_geno_df.loc[low_obs_df.index, 'genotype'].apply(pandas.Series)
     hmm_observed = genotype_bases.eq(low_obs_df['base'], axis=0).sum(axis=1).values
-    lo_freq = None
-    trans_probs = ibd_hmm.state_trans(rec=rec_map,
-                                      gens=args.ngen,
-                                      chrm=args.chrom,
-                                      positions=low_obs_df.index)
-    return hmm_observed, trans_probs, lo_freq
+
+    hmm_low_freqs = numpy.array([frqs.frequency(args.chrom, p, row['base'])
+                                 for p, row in low_obs_df.iterrows()])
+
+    hmm_trs_probs = ibd_hmm.state_trans(rec=rec_map,
+                                        gens=args.ngen,
+                                        chrm=args.chrom,
+                                        positions=low_obs_df.index)
+    return hmm_observed, hmm_trs_probs, hmm_low_freqs
+
+
+def run_ibd_hmm(args, hmm_inputs):
+    """
+    Run the IBD HMM with the given input.
+
+    Args:
+        args: namespace containing the optional arguments
+        hmm_inputs: a tuple containing...
+            hmm_observed: Number of matches with the historical base found in
+                          the modern individual (0, 1, 2) for each position
+                          (numpy array)
+            hmm_trs_probs: Tuple of two numpy arrays containing the transition
+                           probabilities of remaining in the ibd and no-ibd
+                           states.
+            hmm_low_freqs: The frequency in the reference population of the
+                           base observed in the low coverage, historical
+                           individual.
+    Returns:
+        hmm_post_probs: array containing the posterior probability of being
+                        in an IBD segment for each position.
+        called_ibd: array of booleans indicated whether each marker occurs
+                    within a called IBD segment given the criteria in args.
+    """
+    hmm_observed, hmm_trs_probs, hmm_low_freqs = hmm_inputs
+    ibd_trs, noibd_trs = hmm_trs_probs
+
+    hmm_post_probs = ibd_hmm.forward_backward(gens=args.ngen,
+                                              observations=hmm_observed,
+                                              freqs=hmm_low_freqs,
+                                              ibd_trs=ibd_trs,
+                                              noibd_trs=noibd_trs)
+
+    called_ibd = ibd_hmm.find_ibd_blocks(post_probs=hmm_post_probs,
+                                         hi_score=args.max_run,
+                                         lo_score=args.min_run,
+                                         pos=None,
+                                         min_len=args.min_len)
+    return hmm_post_probs, called_ibd
+
+
+def make_results_output(args, rec_map, low_obs_df, hmm_post_probs, called_ibd):
+    """
+    Returns:
+        pos_results_df: a DataFrame containing the positional results from
+                        the HMM scan.
+        seg_results_df: a DataFrame containing the results summarized by
+                        segment.
+    """
+    gpos = low_obs_df.index.map(lambda x: rec_map.position(args.chrom, x))
+    pos_results_df = pandas.DataFrame({'chrom': args.chrom,
+                                       'pos':low_obs_df.index,
+                                       'gpos':gpos,
+                                       'posterior':hmm_post_probs,
+                                       'ibd_call':called_ibd})
+    # TODO: add results by segment.
+    return pos_results_df[['chrom', 'pos', 'gpos', 'posterior', 'ibd_call']]
 
 
 def main():
@@ -135,9 +215,9 @@ def main():
     with open(args.frq_fn, 'r') as frq_in:
         frqs.read_vcf_counts(frq_in)
 
-    rmap = recmap.RecMap()
+    rec_map = recmap.RecMap()
     with open(args.rec_fn, 'r') as rec_in:
-        rmap.read_tab(rec_in)
+        rec_map.read_tab(rec_in)
 
     with pysam.VariantFile(args.vcf_fn) as vcf_in:
         hi_geno_df = make_genotypes_for_indv_from_vcf(vcf_in, args.indv)
@@ -147,7 +227,21 @@ def main():
 
     print('Observed {}/{} SNPs'.format(low_obs_df.shape[0], hi_geno_df.shape[0]))
 
-    print(hi_geno_df)
+    hmm_inputs = encode_hmm_input(args=args,
+                                  low_obs_df=low_obs_df,
+                                  hi_geno_df=hi_geno_df,
+                                  rec_map=rec_map,
+                                  frqs=frqs)
+
+    hmm_post_probs, called_ibd = run_ibd_hmm(args, hmm_inputs)
+
+    pos_results_df = make_results_output(args=args,
+                                         rec_map=rec_map,
+                                         low_obs_df=low_obs_df,
+                                         hmm_post_probs=hmm_post_probs,
+                                         called_ibd=called_ibd)
+    pos_results_df.to_csv('output.tsv', index=False, sep='\t')
+    print(pos_results_df)
     return 0
 
 
