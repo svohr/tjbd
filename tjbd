@@ -16,6 +16,7 @@ import pysam
 import freqs
 import recmap
 import ibd_hmm
+import confusion
 
 
 def make_obs_from_pileup(bamfile_in, obs_pos, args):
@@ -170,8 +171,29 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs, called_ibd):
                                        'gpos':gpos,
                                        'posterior':hmm_post_probs,
                                        'ibd_call':called_ibd})
-    # TODO: add results by segment.
-    return pos_results_df[['chrom', 'pos', 'gpos', 'posterior', 'ibd_call']]
+
+    seg_interval_indexes = confusion.get_segment_intervals(called_ibd)
+    seg_results_df = pandas.DataFrame(seg_interval_indexes,
+                                      columns=['start_index', 'end_index'],
+                                      dtype='int')
+    seg_results_df['chrom'] = args.chrom
+
+    seg_results_df['n_snps'] = (seg_results_df['end_index']
+                                - seg_results_df['start_index'] + 1)
+
+    seg_results_df['start'] = pos_results_df['pos'].loc[seg_results_df['start_index']]
+    seg_results_df['end'] = pos_results_df['pos'].loc[seg_results_df['end_index']]
+    seg_results_df['physical_length'] = (seg_results_df['end']
+                                         - seg_results_df['start'])
+
+    seg_results_df['genetic_length'] = (
+        seg_results_df['end_index'].map(lambda x: gpos[x])
+        - seg_results_df['start_index'].map(lambda x: gpos[x])
+    )
+
+    return (pos_results_df[['chrom', 'pos', 'gpos', 'posterior', 'ibd_call']],
+            seg_results_df[['chrom', 'start', 'end',
+                            'n_snps', 'physical_length', 'genetic_length']])
 
 
 def main():
@@ -235,12 +257,14 @@ def main():
 
     hmm_post_probs, called_ibd = run_ibd_hmm(args, hmm_inputs)
 
-    pos_results_df = make_results_output(args=args,
-                                         rec_map=rec_map,
-                                         low_obs_df=low_obs_df,
-                                         hmm_post_probs=hmm_post_probs,
-                                         called_ibd=called_ibd)
-    pos_results_df.to_csv('output.tsv', index=False, sep='\t')
+    pos_results_df, seg_results_df = make_results_output(
+                                        args=args,
+                                        rec_map=rec_map,
+                                        low_obs_df=low_obs_df,
+                                        hmm_post_probs=hmm_post_probs,
+                                        called_ibd=called_ibd)
+    pos_results_df.to_csv('output_pos.tsv', index=False, sep='\t')
+    seg_results_df.to_csv('output_seg.tsv', index=False, sep='\t')
     print(pos_results_df)
     return 0
 
