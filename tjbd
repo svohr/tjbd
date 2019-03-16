@@ -229,8 +229,8 @@ def main():
     parser.add_argument("-L", "--min-len", dest="min_len", type=float,
                         metavar="cM", default=0.0,
                         help="Minimum length of IBD segment to call.")
-    parser.add_argument("-o", "--out-dir", type=str, default='trial',
-                        help="Set the name of the output directory.")
+    parser.add_argument("-o", "--out-prefix", type=str, default='output',
+                        help="Set prefix for the output files.")
     args = parser.parse_args()
 
     frqs = freqs.AlleleFreqs()
@@ -263,8 +263,10 @@ def main():
                                         low_obs_df=low_obs_df,
                                         hmm_post_probs=hmm_post_probs,
                                         called_ibd=called_ibd)
-    pos_results_df.to_csv('output_pos.tsv', index=False, sep='\t')
-    seg_results_df.to_csv('output_seg.tsv', index=False, sep='\t')
+    pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
+                          index=False, sep='\t')
+    seg_results_df.to_csv('{}.seg.tsv'.format(args.out_prefix),
+                          index=False, sep='\t')
     print(pos_results_df)
     return 0
 
