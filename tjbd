@@ -39,7 +39,7 @@ def make_obs_from_pileup(bamfile_in, obs_pos, args):
     obs_pos_base = []
     pos_set = set(obs_pos)
     for col in pileup_iter:
-        if col.reference_pos not in pos_set or col.nsegments != 1:
+        if (col.reference_pos + 1) not in pos_set or col.nsegments != 1:
             continue
 
         map_quals = col.get_mapping_qualities()
@@ -51,7 +51,7 @@ def make_obs_from_pileup(bamfile_in, obs_pos, args):
 
         base = col.get_query_sequences()[0].upper()
         if base in 'ACGT':
-            obs_pos_base.append((col.reference_pos, base))
+            obs_pos_base.append((col.reference_pos + 1, base))
 
     low_obs_df = pandas.DataFrame(obs_pos_base, columns=['pos', 'base'])
     low_obs_df.set_index('pos', inplace=True)
@@ -181,8 +181,8 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs, called_ibd):
     seg_results_df['n_snps'] = (seg_results_df['end_index']
                                 - seg_results_df['start_index'] + 1)
 
-    seg_results_df['start'] = pos_results_df['pos'].loc[seg_results_df['start_index']]
-    seg_results_df['end'] = pos_results_df['pos'].loc[seg_results_df['end_index']]
+    seg_results_df['start'] = pos_results_df.loc[seg_results_df['start_index'], 'pos'].values
+    seg_results_df['end'] = pos_results_df.loc[seg_results_df['end_index'], 'pos'].values
     seg_results_df['physical_length'] = (seg_results_df['end']
                                          - seg_results_df['start'])
 
@@ -267,7 +267,6 @@ def main():
                           index=False, sep='\t')
     seg_results_df.to_csv('{}.seg.tsv'.format(args.out_prefix),
                           index=False, sep='\t')
-    print(pos_results_df)
     return 0
 
 

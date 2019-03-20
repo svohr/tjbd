@@ -4,6 +4,10 @@ freqs.py
 This file contains functions for reading allele count output from VCF tools.
 """
 
+from __future__ import print_function
+
+import sys
+
 
 class AlleleFreqs(object):
     """
@@ -72,6 +76,8 @@ class AlleleFreqs(object):
                 return 1 - (0.5 / self.total)
             return self.freqs[key]
         else:
+            print("Not Found! {} {} {}".format(chrm, pos, base),
+                  file=sys.stderr)
             # if base is not found in population, return a pseudocount freq.
             return 0.5 / self.total
 
