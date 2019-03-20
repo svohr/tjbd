@@ -33,6 +33,7 @@ def make_obs_from_pileup(bamfile_in, obs_pos, args):
         A pandas DataFrame containing a single base observed from each site
         in obs_pos (when possible) indexed by position.
     '''
+    bases = set('ACGT')
     # pileup coords are 1-based, but these are 0-based.
     pileup_iter = bamfile_in.pileup(args.chrom)
 
@@ -50,7 +51,7 @@ def make_obs_from_pileup(bamfile_in, obs_pos, args):
             continue
 
         base = col.get_query_sequences()[0].upper()
-        if base in 'ACGT':
+        if base in bases:
             obs_pos_base.append((col.reference_pos + 1, base))
 
     low_obs_df = pandas.DataFrame(obs_pos_base, columns=['pos', 'base'])
