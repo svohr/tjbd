@@ -138,8 +138,6 @@ def run_ibd_hmm(args, hmm_inputs):
     Returns:
         hmm_post_probs: array containing the posterior probability of being
                         in an IBD segment for each position.
-        called_ibd: array of booleans indicated whether each marker occurs
-                    within a called IBD segment given the criteria in args.
     """
     hmm_observed, hmm_trs_probs, hmm_low_freqs = hmm_inputs
     ibd_trs, noibd_trs = hmm_trs_probs
@@ -149,16 +147,10 @@ def run_ibd_hmm(args, hmm_inputs):
                                               freqs=hmm_low_freqs,
                                               ibd_trs=ibd_trs,
                                               noibd_trs=noibd_trs)
-
-    called_ibd = ibd_hmm.find_ibd_blocks(post_probs=hmm_post_probs,
-                                         hi_score=args.max_run,
-                                         lo_score=args.min_run,
-                                         pos=None,
-                                         min_len=args.min_len)
-    return hmm_post_probs, called_ibd
+    return hmm_post_probs
 
 
-def make_results_output(args, rec_map, low_obs_df, hmm_post_probs, called_ibd):
+def make_results_output(args, rec_map, low_obs_df, hmm_post_probs):
     """
     Returns:
         pos_results_df: a DataFrame containing the positional results from
@@ -167,6 +159,13 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs, called_ibd):
                         segment.
     """
     gpos = low_obs_df.index.map(lambda x: rec_map.position(args.chrom, x))
+
+    called_ibd = ibd_hmm.find_ibd_blocks(post_probs=hmm_post_probs,
+                                         hi_score=args.max_run,
+                                         lo_score=args.min_run,
+                                         pos=gpos,
+                                         min_len=args.min_len)
+
     pos_results_df = pandas.DataFrame({'chrom': args.chrom,
                                        'pos':low_obs_df.index,
                                        'gpos':gpos,
@@ -192,9 +191,16 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs, called_ibd):
         - seg_results_df['start_index'].map(lambda x: gpos[x])
     )
 
+    if len(seg_results_df) > 0:
+        seg_results_df['max_post_prob'] = seg_results_df.apply(
+            lambda r: hmm_post_probs[r['start_index']:r['end_index'] + 1].max(),
+            axis=1
+        )
+
     return (pos_results_df[['chrom', 'pos', 'gpos', 'posterior', 'ibd_call']],
             seg_results_df[['chrom', 'start', 'end',
-                            'n_snps', 'physical_length', 'genetic_length']])
+                            'n_snps', 'physical_length', 'genetic_length',
+                            'max_post_prob']])
 
 
 def main():
@@ -256,14 +262,13 @@ def main():
                                   rec_map=rec_map,
                                   frqs=frqs)
 
-    hmm_post_probs, called_ibd = run_ibd_hmm(args, hmm_inputs)
+    hmm_post_probs = run_ibd_hmm(args, hmm_inputs)
 
     pos_results_df, seg_results_df = make_results_output(
-                                        args=args,
-                                        rec_map=rec_map,
-                                        low_obs_df=low_obs_df,
-                                        hmm_post_probs=hmm_post_probs,
-                                        called_ibd=called_ibd)
+        args=args,
+        rec_map=rec_map,
+        low_obs_df=low_obs_df,
+        hmm_post_probs=hmm_post_probs)
     pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
                           index=False, sep='\t')
     seg_results_df.to_csv('{}.seg.tsv'.format(args.out_prefix),

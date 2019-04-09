@@ -327,7 +327,7 @@ def find_ibd_blocks_basic(post_probs, hi_score, lo_score):
     return called_ibd
 
 
-def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=None):
+def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=None, min_markers=None):
     """
     Takes a vector of posterior probabilities from the forward backward
     algorithm and finds regions where the probability exceeds lo_score,
@@ -343,6 +343,8 @@ def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=None):
         pos: a vector of positions (physical or genetic) for each marker in
              post_probs.
         min_len: a minimum length that a contiguous segment must meet.
+        min_markers: a minimum number of markers that a contiguous segment
+                     must contain.
     Returns:
         A vector indicating whether a position is in an IBD block (True) or
         not (False) for each position.
