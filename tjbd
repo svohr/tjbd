@@ -191,6 +191,7 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs):
         - seg_results_df['start_index'].map(lambda x: gpos[x])
     )
 
+    seg_results_df['max_post_prob'] = 0
     if len(seg_results_df) > 0:
         seg_results_df['max_post_prob'] = seg_results_df.apply(
             lambda r: hmm_post_probs[r['start_index']:r['end_index'] + 1].max(),
