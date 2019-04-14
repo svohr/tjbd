@@ -60,7 +60,7 @@ def state_trans(rec, gens, chrm, positions):
     return ibd_trs, noibd_trs
 
 
-def prob_obs_ibd(freq, obs_match):
+def prob_obs_ibd(freq, obs_match, err=0.01):
     """
     Returns the probability of making observation "obs" within an IBD segment.
 
@@ -71,6 +71,7 @@ def prob_obs_ibd(freq, obs_match):
     Returns:
         The probability observation "obs_match" within an IBD segment.
     """
+    freq = ((1.0 - err) * freq) + err
     if obs_match == 2:
         return (1 + freq) / 2.0
     elif obs_match == 1:
@@ -78,7 +79,7 @@ def prob_obs_ibd(freq, obs_match):
     return freq / 2.0 # no match observed
 
 
-def prob_obs_noibd(freq, _):
+def prob_obs_noibd(freq, _, err=0.01):
     """
     Returns the probability of making observation "obs" outside of an
     IBD segment.
@@ -93,7 +94,7 @@ def prob_obs_noibd(freq, _):
     """
     # Does not matter if allele matches or not, outside of IBD the
     # probability of observation is always just the allele frequency.
-    return freq
+    return ((1.0 - err) * freq) + err
 
 
 def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
