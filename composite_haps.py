@@ -77,6 +77,37 @@ def write_composites(out, vcf_rec, gpos, compo_src):
     return
 
 
+def write_composites_as_vcf_row(out, vcf_rec, gpos, compo_src):
+    """
+    Writes a single row of a VCF file with the genotypes of each composite
+    individual.
+
+    Args:
+        out: destination to write entry.
+        vcf_rec: A VCF VariantRecord,
+        compo_src: The current source individual for each composite individual.
+    Returns:
+        nothing.
+    """
+    def info_to_str(key, value):
+        value_tuple = value if isinstance(value, tuple) else (value,)
+        return '{}={}'.format(key, ','.join(value_tuple))
+    out.write('\t'.join([vcf_rec.chrom,
+                         str(vcf_rec.pos),
+                         vcf_rec.id,
+                         vcf_rec.ref,
+                         ','.join(vcf_rec.alts),
+                         vcf_rec.qual,
+                         ','.join(vcf_rec.filter.keys()),
+                         ';'.join(info_to_str(k, v)
+                                  for (k, v) in vcf_rec.info.iteritems()),
+                         'GT']))
+    for _, src in enumerate(compo_src):
+        out.write("\t{}|{}".format(*vcf_rec.samples[src]['GT']))
+    out.write("\n")
+    return
+
+
 def main():
     """
     do thing.
@@ -96,6 +127,7 @@ def main():
         rmap.read_tab(rec_in)
 
     with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
+        # TODO: if writing VCF, dump out header
         cmp_src = None
         for rec in vcf_in.fetch():
             _ = rec.alts # this avoids a segfault
