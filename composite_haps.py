@@ -77,7 +77,7 @@ def write_composites(out, vcf_rec, gpos, compo_src):
     return
 
 
-def write_composites_as_vcf_row(out, vcf_rec, gpos, compo_src):
+def write_composites_as_vcf_row(out, vcf_rec, _, compo_src):
     """
     Writes a single row of a VCF file with the genotypes of each composite
     individual.
@@ -89,22 +89,33 @@ def write_composites_as_vcf_row(out, vcf_rec, gpos, compo_src):
     Returns:
         nothing.
     """
-    def info_to_str(key, value):
-        value_tuple = value if isinstance(value, tuple) else (value,)
-        return '{}={}'.format(key, ','.join(value_tuple))
-    out.write('\t'.join([vcf_rec.chrom,
-                         str(vcf_rec.pos),
-                         vcf_rec.id,
-                         vcf_rec.ref,
-                         ','.join(vcf_rec.alts),
-                         vcf_rec.qual,
-                         ','.join(vcf_rec.filter.keys()),
-                         ';'.join(info_to_str(k, v)
-                                  for (k, v) in vcf_rec.info.iteritems()),
-                         'GT']))
+    items = vcf_rec.__str__().split('\t')[:8] + ['GT']
+    out.write('\t'.join(items))
     for _, src in enumerate(compo_src):
         out.write("\t{}|{}".format(*vcf_rec.samples[src]['GT']))
     out.write("\n")
+    return
+
+
+def write_vcf_header(out, vcf, ncomps):
+    '''
+    Writes the VCF header to the output file handle but changes the sample
+    names for the new composite individuals.
+
+    Args:
+        out: destination to write header
+        vcf: VariantFile object that composites are based on
+        ncomps: Number of composite individuals
+    Returns:
+        nothing.
+    '''
+    composite_ids = ['composite{:03}'.format(i) for i in range(1, ncomps + 1)]
+    for line in vcf.header.__str__().strip().split('\n'):
+        if line.startswith('#CHROM\t'):
+            items = line.split('\t')
+            out.write('\t'.join(items[:9] + composite_ids) + '\n')
+        else:
+            out.write(line + '\n')
     return
 
 
@@ -120,6 +131,8 @@ def main():
     parser.add_argument("-s", "--size", dest="segsize", metavar="cM",
                         type=float, default=0.2,
                         help="Size of segments to use (in centiMorgans)")
+    parser.add_argument("-v", "--vcf", action='store_true', default=False,
+                        help="Write output in VCF format,")
     args = parser.parse_args()
 
     rmap = recmap.RecMap()
@@ -127,18 +140,22 @@ def main():
         rmap.read_tab(rec_in)
 
     with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
-        # TODO: if writing VCF, dump out header
+        nsamps = len(vcf_in.header.samples)
+        if args.vcf:
+            write_vcf_header(sys.stdout, vcf_in, nsamps / 2)
         cmp_src = None
         for rec in vcf_in.fetch():
             _ = rec.alts # this avoids a segfault
             gpos = rmap.position(rec.chrom, rec.pos)
             if cmp_src is None:
-                cmp_src, cmp_off = init_composites(len(vcf_in.header.samples),
-                                                   args.segsize, gpos)
+                cmp_src, cmp_off = init_composites(nsamps, args.segsize, gpos)
             else:
                 cmp_src, cmp_off = update_composites(cmp_src, cmp_off,
                                                      args.segsize, gpos)
-            write_composites(sys.stdout, rec, gpos, cmp_src)
+            if args.vcf:
+                write_composites_as_vcf_row(sys.stdout, rec, gpos, cmp_src)
+            else:
+                write_composites(sys.stdout, rec, gpos, cmp_src)
 
     return 0
 
