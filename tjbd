@@ -19,7 +19,7 @@ import ibd_hmm
 import confusion
 
 
-def make_obs_from_pileup(bamfile_in, obs_pos, args):
+def make_obs_from_pileup(args, bamfile_in, obs_pos):
     '''
     Make a DataFrame of observed bases from pileup format input.
 
@@ -59,7 +59,51 @@ def make_obs_from_pileup(bamfile_in, obs_pos, args):
     return low_obs_df
 
 
-def make_genotypes_for_indv_from_vcf(vcf_in, indv):
+def make_simulated_obs_from_vcf(args, vcf_in, obs_pos):
+    '''
+    Make a DataFrame of observed bases from a VCF file for testing.
+
+    Args:
+        vcf_in: VCF file of genotype calls
+        obs_pos: Positions of interest at which to make observations.
+        args: namespace containing the optional arguments
+    Returns:
+        A pandas DataFrame containing a single base observed from each site
+        in obs_pos (when possible) indexed by position.
+    '''
+    def base_error(orig_base):
+        '''
+        Simulate a base call error by picking a base at random that is not
+        the correct one.
+        '''
+        return numpy.random.choice([base for base in 'ACGT'
+                                    if base != orig_base])
+
+    obs_pos_base = []
+
+    obs_mask = numpy.random.poisson(args.sim_coverage, obs_pos.shape[0]) == 1
+    obs_chrm = numpy.random.choice([0, 1], obs_pos.shape[0])
+
+    obs_chrm_by_pos = {obs_pos[i]: obs_chrm[i]
+                       for i in xrange(obs_pos.shape[0]) if obs_mask[i]}
+
+    for rec in vcf_in.fetch(args.chrom):
+        geno = rec.samples[args.sim_indv]['GT']
+
+        if any(g is None for g in geno) or rec.pos not in obs_chrm_by_pos:
+            continue
+
+        base = geno[obs_chrm_by_pos[rec.pos]]
+        if numpy.random.binomial(1, args.sim_error_rate) != 0:
+            base = base_error(base)
+        obs_pos_base.append((rec.pos, base))
+
+    low_obs_df = pandas.DataFrame(obs_pos_base, columns=['pos', 'base'])
+    low_obs_df.set_index('pos', inplace=True)
+    return low_obs_df
+
+
+def make_genotypes_for_indv_from_vcf(args, vcf_in, indv):
     """
     Makes a DataFrame of genotypes for a single individual from a VCF file.
 
@@ -71,7 +115,7 @@ def make_genotypes_for_indv_from_vcf(vcf_in, indv):
     """
     pos = []
     genotypes = []
-    for rec in vcf_in:
+    for rec in vcf_in.fetch(args.chrom):
         geno = rec.samples[indv]['GT']
 
         if any(g is None for g in geno):
@@ -239,6 +283,16 @@ def main():
                         help="Minimum length of IBD segment to call.")
     parser.add_argument("-o", "--out-prefix", type=str, default='output',
                         help="Set prefix for the output files.")
+    parser.add_argument("--sim-indv", type=str, default=None,
+                        help="Simulate low-coverage using this individual "
+                             "(ignores bam input).")
+    parser.add_argument("--sim-vcf", dest="sim_vcf_fn", metavar="file.vcf",
+                        type=str, default=None,
+                        help="Use VCF for simulated low-coverage individual")
+    parser.add_argument("--sim-coverage", type=str, default=None,
+                        help="Fold-coverage to simulate.")
+    parser.add_argument("--sim-error-rate", type=str, default=None,
+                        help="Sequencing error rate for simulations.")
     args = parser.parse_args()
 
     frqs = freqs.AlleleFreqs()
@@ -250,10 +304,17 @@ def main():
         rec_map.read_tab(rec_in)
 
     with pysam.VariantFile(args.vcf_fn) as vcf_in:
-        hi_geno_df = make_genotypes_for_indv_from_vcf(vcf_in, args.indv)
+        hi_geno_df = make_genotypes_for_indv_from_vcf(args, vcf_in, args.indv)
 
-    with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
-        low_obs_df = make_obs_from_pileup(bam_in, hi_geno_df.index, args)
+    if args.sim_indv:
+        sim_vcf_fn = args.sim_vcf_fn if args.sim_vcf_fn else args.vcf_fn
+        with pysam.VariantFile(sim_vcf_fn) as sim_vcf_in:
+            low_obs_df = make_simulated_obs_from_vcf(args,
+                                                     sim_vcf_in,
+                                                     hi_geno_df.index)
+    else:
+        with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
+            low_obs_df = make_obs_from_pileup(args, bam_in, hi_geno_df.index)
 
     print('Observed {}/{} SNPs'.format(low_obs_df.shape[0], hi_geno_df.shape[0]))
 
