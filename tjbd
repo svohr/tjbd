@@ -294,7 +294,12 @@ def main():
                         help="Fold-coverage to simulate.")
     parser.add_argument("--sim-error-rate", type=float, default=None,
                         help="Sequencing error rate for simulations.")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Set seed for random number generation.")
     args = parser.parse_args()
+
+    if args.seed is not None:
+        numpy.random.seed(args.seed)
 
     frqs = freqs.AlleleFreqs()
     with open(args.frq_fn, 'r') as frq_in:
