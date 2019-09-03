@@ -54,8 +54,8 @@ def state_trans(rec, gens, chrm, positions):
     # Important: any recombination will break an IBD segment, but a
     # recombination in a no IBD segment can be in between two no IBD segments.
     # Weight noibd transitions accordingly.
-    noibd_trs = numpy.add(gens - 1, ibd_trs)
-    noibd_trs = numpy.divide(noibd_trs, gens, noibd_trs)
+    exp_noibd_prop = 0.5 ** (gens - 1)
+    noibd_trs = ibd_trs + (exp_noibd_prop * (1.0 - ibd_trs))
 
     return ibd_trs, noibd_trs
 
@@ -122,10 +122,13 @@ def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     fwd_scale = numpy.empty(len(observations))
 
     # Forward probabilities
-    # fill in the first, chance of starting in IBD is 1 / N_generations
-    fwd_ibd_scaled[0] = prob_obs_ibd(freqs[0], observations[0]) * (1.0 / gens)
+    # fill in the first, chance of starting in IBD is the expected fraction
+    # of the genome inherited from an ancestor N generations ago.
+    init_ibd_prob = 0.5 ** (gens - 1)
+    fwd_ibd_scaled[0] = (prob_obs_ibd(freqs[0], observations[0])
+                         * init_ibd_prob)
     fwd_noibd_scaled[0] = (prob_obs_noibd(freqs[0], observations[0])
-                           * ((gens - 1.0) / gens))
+                           * (1.0 - init_ibd_prob))
     fwd_scale[0] = fwd_ibd_scaled[0] + fwd_noibd_scaled[0]
     fwd_ibd_scaled[0] /= fwd_scale[0]
     fwd_noibd_scaled[0] /= fwd_scale[0]

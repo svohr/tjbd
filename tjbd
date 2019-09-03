@@ -187,6 +187,11 @@ def run_ibd_hmm(args, hmm_inputs):
     hmm_observed, hmm_trs_probs, hmm_low_freqs = hmm_inputs
     ibd_trs, noibd_trs = hmm_trs_probs
 
+    assert (ibd_trs > 0.0).all()
+    assert (ibd_trs < 1.0).all()
+    assert (noibd_trs > 0.0).all()
+    assert (noibd_trs < 1.0).all()
+
     hmm_post_probs = ibd_hmm.forward_backward(gens=args.ngen,
                                               observations=hmm_observed,
                                               freqs=hmm_low_freqs,
