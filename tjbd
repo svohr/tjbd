@@ -327,6 +327,12 @@ def main():
         with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
             low_obs_df = make_obs_from_pileup(args, bam_in, hi_geno_df.index)
 
+    # We may observe bases in the low-coverage sample that are not found in
+    # the reference panel. Ignore those sites (tri-allelic, likely error).
+    biallelic_sites = numpy.array([frqs.isin(args.chrom, p, row['base'])
+                                   for p, row in low_obs_df.iterrows()])
+    low_obs_df = low_obs_df[biallelic_sites]
+
     print('Observed {}/{} SNPs'.format(low_obs_df.shape[0], hi_geno_df.shape[0]))
 
     hmm_inputs = encode_hmm_input(args=args,

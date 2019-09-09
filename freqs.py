@@ -81,6 +81,12 @@ class AlleleFreqs(object):
             # if base is not found in population, return a pseudocount freq.
             return 0.5 / self.total
 
+    def isin(self, chrm, pos, base):
+        """
+        Returns True if there is an observed frequency for this
+        chromosome/position/base combination.
+        """
+        return _key(chrm, pos, base) in self.freqs
 
 def _key(chrm, pos, base):
     """
