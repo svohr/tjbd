@@ -7,7 +7,7 @@ Sam Vohr (svohr@soe.ucsc.edu)
 Wed Aug 21 18:31:11 PDT 2019
 
 '''
-
+from __future__ import print_function, division
 
 import sys
 import argparse
@@ -29,45 +29,52 @@ def main():
                                      names=['iid1', 'iid2',
                                             'chrom', 'start', 'end',
                                             'ibd', 'start_cm', 'end_cm',
-                                            'size_cm'])
-    pedsim_segs_df = pedsim_segs_df[pedsim_segs_df['chrom'] == chrom]
+                                            'size_cm'],
+                                     dtype={'chrom': str})
+    pedsim_segs_df = pedsim_segs_df[pedsim_segs_df['chrom'] == args.chrom]
 
     tjbd_segs_df = pandas.read_csv(args.tjbd_segs_fn, sep='\t')
     tjbd_pos_df = pandas.read_csv(args.tjbd_pos_fn, sep='\t')
 
-    tjbd_pos_fn['ibd_pedsim'] = False
+    tjbd_pos_df['ibd_pedsim'] = False
+
+    segment_tp = 0
+    segment_fn = 0
+    segment_fp = 0
 
     for _, seg in pedsim_segs_df.iterrows():
-        seg_mask = (tjbd_pos_fn['pos'] >= seg['start']
-                    & tjbd_pos_fn['pos'] <= seg['end'])
+        seg_mask = ((tjbd_pos_df['pos'] >= seg['start'])
+                    & (tjbd_pos_df['pos'] <= seg['end']))
         tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'] = True
 
         segment_tp += tjbd_pos_df.loc[seg_mask, 'ibd_call'].any()
         segment_fn += not tjbd_pos_df.loc[seg_mask, 'ibd_call'].any()
 
     for _, seg in tjbd_segs_df.iterrows():
-        seg_mask = (tjbd_pos_fn['pos'] >= seg['start']
-                    & tjbd_pos_fn['pos'] <= seg['end'])
+        seg_mask = ((tjbd_pos_df['pos'] >= seg['start'])
+                    & (tjbd_pos_df['pos'] <= seg['end']))
         segment_fp += not tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].any()
 
-    # Stuff to measure
-    # Segments:
-    # # of True Positives
-    # # of True Negatives
-    # # of False Positives
-    # # of False Negatives
+    summary = pandas.Series()
+    summary['n_segs_true'] = len(pedsim_segs_df)
+    summary['n_segs_detected'] = len(tjbd_segs_df)
+    summary['total_ibd_cm_true'] = pedsim_segs_df['size_cm'].sum()
+    summary['total_ibd_cm_detected'] = tjbd_segs_df['genetic_length'].sum()
 
-    # Positions:
-    # # of True Positives (positions correctly called IBD)
-    # # of True Negatives (positions correctly called no-IBD)
-    # # of False Positives
-    # # of False Negatives
+    summary['seg_tp'] = segment_tp
+    summary['seg_fp'] = segment_fp
+    summary['seg_fn'] = segment_fn
 
-    # True number of segments
-    # Detected number of segments
-    # True total IBD
-    # Detected total IBD
+    summary['pos_tp'] = (tjbd_pos_df['ibd_pedsim']
+                         & tjbd_pos_df['ibd_call']).sum()
+    summary['pos_tn'] = (~tjbd_pos_df['ibd_pedsim']
+                         & ~tjbd_pos_df['ibd_call']).sum()
+    summary['pos_fp'] = (~tjbd_pos_df['ibd_pedsim']
+                         & tjbd_pos_df['ibd_call']).sum()
+    summary['pos_fn'] = (tjbd_pos_df['ibd_pedsim']
+                         & ~tjbd_pos_df['ibd_call']).sum()
 
+    print(summary)
     return 0
 
 
