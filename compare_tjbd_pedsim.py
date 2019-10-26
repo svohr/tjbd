@@ -15,51 +15,53 @@ import argparse
 import pandas
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('chrom', help='Chromosome number.')
-    parser.add_argument('pedsim_segs_fn', help='Truth segments from ped-sim.')
-    parser.add_argument('tjbd_segs_fn', help='Detected segments from tjbd.')
-    parser.add_argument('tjbd_pos_fn', help='Positional output from tjbd.')
-
-    args = parser.parse_args()
-
-    pedsim_segs_df = pandas.read_csv(args.pedsim_segs_fn,
-                                     sep='\t',
-                                     names=['iid1', 'iid2',
-                                            'chrom', 'start', 'end',
-                                            'ibd', 'start_cm', 'end_cm',
-                                            'size_cm'],
-                                     dtype={'chrom': str})
-    pedsim_segs_df = pedsim_segs_df[pedsim_segs_df['chrom'] == args.chrom]
-
-    tjbd_segs_df = pandas.read_csv(args.tjbd_segs_fn, sep='\t')
-    tjbd_pos_df = pandas.read_csv(args.tjbd_pos_fn, sep='\t')
-
+def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=0.0):
     tjbd_pos_df['ibd_pedsim'] = False
 
     segment_tp = 0
     segment_fn = 0
     segment_fp = 0
 
-    for _, seg in pedsim_segs_df.iterrows():
+    true_segments = []
+    detected_segments = []
+
+    for _, seg in pedsim_seg_df.iterrows():
         seg_mask = ((tjbd_pos_df['pos'] >= seg['start'])
                     & (tjbd_pos_df['pos'] <= seg['end']))
         tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'] = True
 
-        segment_tp += tjbd_pos_df.loc[seg_mask, 'ibd_call'].any()
-        segment_fn += not tjbd_pos_df.loc[seg_mask, 'ibd_call'].any()
+        detected = tjbd_pos_df.loc[seg_mask, 'ibd_call'].any()
+        segment_fn += not detected
 
-    for _, seg in tjbd_segs_df.iterrows():
+        true_segments.append({
+            'size_cm': seg['size_cm'],
+            'size_bp': seg['end'] - seg['start'],
+            'detected': int(detected),
+            'missed': int(not detected)})
+
+    for _, seg in tjbd_seg_df.iterrows():
         seg_mask = ((tjbd_pos_df['pos'] >= seg['start'])
                     & (tjbd_pos_df['pos'] <= seg['end']))
+        segment_tp += tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].any()
         segment_fp += not tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].any()
 
+        overlaps_true = (tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].sum()
+                         >= (seg_mask.sum() / 2))
+        detected_segments.append({
+            'size_cm': seg['genetic_length'],
+            'size_bp': seg['physical_length'],
+            'true_positive': int(overlaps_true),
+            'false_positive': int(not overlaps_true)})
+
     summary = pandas.Series()
-    summary['n_segs_true'] = len(pedsim_segs_df)
-    summary['n_segs_detected'] = len(tjbd_segs_df)
-    summary['total_ibd_cm_true'] = pedsim_segs_df['size_cm'].sum()
-    summary['total_ibd_cm_detected'] = tjbd_segs_df['genetic_length'].sum()
+    summary['n_segs_true'] = len(pedsim_seg_df)
+    summary['n_segs_true_detectable'] = (
+        pedsim_seg_df['size_cm'] >= min_size).sum()
+    summary['n_segs_detected'] = len(tjbd_seg_df)
+    summary['total_ibd_cm_true'] = pedsim_seg_df['size_cm'].sum()
+    summary['total_ibd_cm_true_detectable'] = pedsim_seg_df.loc[
+        pedsim_seg_df['size_cm'] >= min_size, 'size_cm'].sum()
+    summary['total_ibd_cm_detected'] = tjbd_seg_df['genetic_length'].sum()
 
     summary['seg_tp'] = segment_tp
     summary['seg_fp'] = segment_fp
@@ -74,7 +76,66 @@ def main():
     summary['pos_fn'] = (tjbd_pos_df['ibd_pedsim']
                          & ~tjbd_pos_df['ibd_call']).sum()
 
-    print(summary)
+    return summary, true_segments, detected_segments
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('pedsim_seg_fn', help='Truth segments from ped-sim.')
+    parser.add_argument('tjbd_template',
+                        help='Chromosome output template for tjbd, '
+                             'e.g., "output_chr{}"')
+    parser.add_argument('out_prefix', help='Prefix for output files')
+    parser.add_argument('-m', '--min-size', type=float, default=0.0,
+                        help='Minimum reported segment size.')
+    args = parser.parse_args()
+
+    all_pedsim_seg_df = pandas.read_csv(args.pedsim_seg_fn,
+                                        sep='\t',
+                                        names=['iid1', 'iid2',
+                                               'chrom', 'start', 'end',
+                                               'ibd', 'start_cm', 'end_cm',
+                                               'size_cm'],
+                                        dtype={'chrom': str})
+
+    chrom_summaries = []
+    true_segments = []
+    detected_segments = []
+    for chrom in (str(c) for c in range(1, 23)):
+        print(chrom, file=sys.stderr)
+        pedsim_seg_df = all_pedsim_seg_df[all_pedsim_seg_df['chrom'] == chrom]
+
+        tjbd_seg_fn = '{}.seg.tsv'.format(args.tjbd_template.format(chrom))
+        tjbd_pos_fn = '{}.pos.tsv'.format(args.tjbd_template.format(chrom))
+
+        tjbd_seg_df = pandas.read_csv(tjbd_seg_fn, sep='\t')
+        tjbd_pos_df = pandas.read_csv(tjbd_pos_fn, sep='\t')
+
+        summary, true_segs, detected_segs = (
+            compare_chromosome(chrom=chrom,
+                               pedsim_seg_df=pedsim_seg_df,
+                               tjbd_seg_df=tjbd_seg_df,
+                               tjbd_pos_df=tjbd_pos_df,
+                               min_size=args.min_size)
+        )
+        chrom_summaries.append(summary)
+        true_segments += true_segs
+        detected_segments += detected_segs
+
+    summary = pandas.DataFrame(chrom_summaries).sum()
+
+    true_segments_df = pandas.DataFrame(true_segments)
+    detected_segments_df = pandas.DataFrame(detected_segments)
+
+    summary.to_frame().T.to_csv('{}_summary.tsv'.format(args.out_prefix),
+                                sep='\t', index=False, header=False)
+    true_cols = ['size_cm', 'size_bp', 'detected', 'missed']
+    true_segments_df[true_cols].to_csv(
+        '{}_true_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
+    detected_cols = ['size_cm', 'size_bp', 'true_positive', 'false_positive']
+    detected_segments_df[detected_cols].to_csv(
+        '{}_detected_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
+
     return 0
 
 
