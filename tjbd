@@ -236,10 +236,10 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs):
     seg_results_df['physical_length'] = (seg_results_df['end']
                                          - seg_results_df['start'])
 
-    seg_results_df['genetic_length'] = (
-        seg_results_df['end_index'].map(lambda x: gpos[x])
-        - seg_results_df['start_index'].map(lambda x: gpos[x])
-    )
+    seg_results_df['start_cm'] = pos_results_df.loc[seg_results_df['start_index'], 'gpos'].values
+    seg_results_df['end_cm'] = pos_results_df.loc[seg_results_df['end_index'], 'gpos'].values
+    seg_results_df['genetic_length'] = (seg_results_df['end_cm']
+                                        - seg_results_df['start_cm'])
 
     seg_results_df['max_post_prob'] = 0
     if len(seg_results_df) > 0:
@@ -250,7 +250,8 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs):
 
     return (pos_results_df[['chrom', 'pos', 'gpos', 'posterior', 'ibd_call']],
             seg_results_df[['chrom', 'start', 'end',
-                            'n_snps', 'physical_length', 'genetic_length',
+                            'n_snps', 'physical_length',
+                            'start_cm', 'end_cm', 'genetic_length',
                             'max_post_prob']])
 
 
