@@ -214,7 +214,8 @@ def make_results_output(args, rec_map, low_obs_df, hmm_post_probs):
                                          hi_score=args.max_run,
                                          lo_score=args.min_run,
                                          pos=gpos,
-                                         min_len=args.min_len)
+                                         min_len=args.min_len,
+                                         merge_len=args.merge_len)
 
     pos_results_df = pandas.DataFrame({'chrom': args.chrom,
                                        'pos':low_obs_df.index,
@@ -288,6 +289,9 @@ def main():
     parser.add_argument("-L", "--min-len", dest="min_len", type=float,
                         metavar="cM", default=0.0,
                         help="Minimum length of IBD segment to call.")
+    parser.add_argument("--merge-len", dest="merge_len", type=float,
+                        metavar="cM", default=0.0,
+                        help="Merge IBD segments within this distance.")
     parser.add_argument("-o", "--out-prefix", type=str, default='output',
                         help="Set prefix for the output files.")
     parser.add_argument("--sim-indv", type=str, default=None,
