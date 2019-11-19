@@ -331,7 +331,7 @@ def find_ibd_blocks_basic(post_probs, hi_score, lo_score):
     return called_ibd
 
 
-def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=None, min_markers=None):
+def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=0, merge_len=0):
     """
     Takes a vector of posterior probabilities from the forward backward
     algorithm and finds regions where the probability exceeds lo_score,
@@ -347,8 +347,7 @@ def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=None, min_
         pos: a vector of positions (physical or genetic) for each marker in
              post_probs.
         min_len: a minimum length that a contiguous segment must meet.
-        min_markers: a minimum number of markers that a contiguous segment
-                     must contain.
+        merge_len: merge blocks within this distance.
     Returns:
         A vector indicating whether a position is in an IBD block (True) or
         not (False) for each position.
@@ -383,7 +382,41 @@ def find_ibd_blocks(post_probs, hi_score, lo_score, pos=None, min_len=None, min_
                 in_ibd = False
     if in_ibd:
         set_segment_ibd(block_start, block_stop)
+
+    if pos is not None:
+        called_ibd = merge_blocks_by_dist(called_ibd, pos, merge_len)
     return called_ibd
+
+
+def merge_blocks_by_dist(called_ibd, pos, merge_len):
+    """
+    Merges IBDs that are within the specified distance.
+
+    Args:
+        called_ibd: a vector of booleans indicating if the given position is
+            in an IBD block.
+        pos: a vector of positions (physical or genetic) for each marker in
+             post_probs.
+        merge_len: merge blocks within this distance.
+    Returns:
+        A vector indicating whether a position is in an IBD block (True) or
+        not (False) for each position.
+    """
+    merged_ibd = called_ibd.copy()
+    gap_starts = list(numpy.where(called_ibd[:-1] & ~called_ibd[1:])[0])
+    gap_ends = list(numpy.where(~called_ibd[:-1] & called_ibd[1:])[0] + 1)
+
+    if len(gap_starts) + len(gap_ends) < 2:
+        return merged_ibd
+
+    if gap_ends[0] < gap_starts[0]:
+        gap_ends.pop(0)
+
+    for start, end in zip(gap_starts[:len(gap_ends)], gap_ends):
+        if pos[end] - pos[start] < merge_len:
+            merged_ibd[start:end] = True
+
+    return merged_ibd
 
 
 def main():
