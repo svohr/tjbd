@@ -25,7 +25,7 @@ def prob_no_recomb(gens, gdist):
     Returns:
         The probability of no recombinations occuring in 'gens' generations.
     """
-    return (1 - gdist / 100.) ** gens
+    return numpy.exp(-0.01 * gdist) ** gens
 
 
 def state_trans(rec, gens, chrm, positions):
