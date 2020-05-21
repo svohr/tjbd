@@ -28,7 +28,7 @@ def make_obs_from_pileup(args, bamfile_in, obs_pos):
         chrom: Chromosome of interest.
         obs_pos: Positions of interest at which to make observations.
         min_mq: Minimum mapping quality required to make a base observation.
-        min_mq: Minimum base quality required to make a base observation.
+        min_bq: Minimum base quality required to make a base observation.
     Returns:
         A pandas DataFrame containing a single base observed from each site
         in obs_pos (when possible) indexed by position.
