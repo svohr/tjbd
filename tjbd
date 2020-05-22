@@ -6,8 +6,8 @@ pair obserations are made from sparse coverage.
 '''
 
 from __future__ import print_function, division
-import sys
 import argparse
+import sys
 
 import numpy
 import pandas
@@ -25,10 +25,12 @@ def make_obs_from_pileup(args, bamfile_in, obs_pos):
 
     Args:
         bamfile_in: Sequences aligned to a reference sequence.
-        chrom: Chromosome of interest.
         obs_pos: Positions of interest at which to make observations.
+
+        From args namespace:
         min_mq: Minimum mapping quality required to make a base observation.
         min_bq: Minimum base quality required to make a base observation.
+        max_cov: Maximum acceptable coverage for observed site.
     Returns:
         A pandas DataFrame containing a single base observed from each site
         in obs_pos (when possible) indexed by position.
@@ -40,17 +42,23 @@ def make_obs_from_pileup(args, bamfile_in, obs_pos):
     obs_pos_base = []
     pos_set = set(obs_pos)
     for col in pileup_iter:
-        if (col.reference_pos + 1) not in pos_set or col.nsegments != 1:
+        if ((col.reference_pos + 1) not in pos_set
+                or col.nsegments > args.max_cov):
             continue
 
         map_quals = col.get_mapping_qualities()
-        if not map_quals or map_quals[0] < args.min_mq:
-            continue
         base_quals = col.get_query_qualities()
-        if not base_quals or base_quals[0] < args.min_bq:
+        query_seqs = col.get_query_sequences()
+
+        ok_bases = [
+            base.upper()
+            for mq, bq, base in zip(map_quals, base_quals, query_seqs)
+            if mq >= args.min_mq and bq >= args.min_bq
+        ]
+        if not ok_bases:
             continue
 
-        base = col.get_query_sequences()[0].upper()
+        base = numpy.random.choice(ok_bases)
         if base in bases:
             obs_pos_base.append((col.reference_pos + 1, base))
 
@@ -81,7 +89,8 @@ def make_simulated_obs_from_vcf(args, vcf_in, obs_pos):
 
     obs_pos_base = []
 
-    obs_mask = numpy.random.poisson(args.sim_coverage, obs_pos.shape[0]) == 1
+    pos_cov = numpy.random.poisson(args.sim_coverage, obs_pos.shape[0])
+    obs_mask = (pos_cov > 0) & (pos_cov <= args.max_cov)
     obs_chrm = numpy.random.choice([0, 1], obs_pos.shape[0])
 
     obs_chrm_by_pos = {obs_pos[i]: obs_chrm[i]
@@ -275,6 +284,9 @@ def main():
                         type=int, default=30, help="Minimum mapping quality.")
     parser.add_argument("-Q", "--base-quality", dest='min_bq', metavar="N",
                         type=int, default=30, help="Minimum base quality.")
+    parser.add_argument("-c", "--max-coverage", dest='max_cov', metavar="N",
+                        type=int, default=1,
+                        help="Exclude sites covered by more than N fragments.")
     parser.add_argument("-g", "--gen", metavar="N", dest="ngen",
                         type=int, default=5,
                         help="Approximate number of generations between "
