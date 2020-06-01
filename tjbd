@@ -112,6 +112,42 @@ def make_simulated_obs_from_vcf(args, vcf_in, obs_pos):
     return low_obs_df
 
 
+def apply_ld_filter(args, ld_df, low_obs_df, frqs):
+    """
+    Filter low coverage observations by R-squared LD metric. LD statistics are
+    stored in a DataFrame along with the chromosome and the two positions,
+    ordered with left-most (lower) position as position 1. Pairs that do
+    not appear in the DataFrame as assumed to be unlinked. For each pair
+    of positions with low coverage observations that appear in the LD table,
+    if the R^2 value exceeds the cutoff, exclude the position with the
+    larger minor allele frequency.
+
+    Args:
+        args: namespace containing optional arguments (max_r2)
+        ld_df: pandas DataFrame containing LD statistics.
+        low_obs_df: pandas DataFrame containing single base observations,
+                    indexed by position.
+        frqs: A set of allele frequencies.
+    Returns:
+        The low coverage DataFrame after LD pruning.
+    """
+    ld_low_df = ld_df[ld_df['POS1'].isin(low_obs_df.index)
+                      & ld_df['POS2'].isin(low_obs_df.index)]
+
+    excluded = set()
+
+    for _, row in ld_low_df.sort_values(['pos2', 'pos1']).iterrows():
+        if ((row['pos1'] not in excluded and row['pos2'] not in excluded)
+                and row['r^2'] > args.max_r2):
+            freq1 = frqs.min_af(row['chrom'], row['pos1'])
+            freq2 = frqs.min_af(row['chrom'], row['pos2'])
+            excluded.add(row['pos1'] if freq1 < freq2 else row['pos2'])
+
+    print('Exclude {} SNPs due to high LD'.format(len(excluded)))
+
+    return low_obs_df[~low_obs_df.index.isin(excluded)]
+
+
 def make_genotypes_for_indv_from_vcf(args, vcf_in, indv):
     """
     Makes a DataFrame of genotypes for a single individual from a VCF file.
@@ -287,6 +323,11 @@ def main():
     parser.add_argument("-c", "--max-coverage", dest='max_cov', metavar="N",
                         type=int, default=1,
                         help="Exclude sites covered by more than N fragments.")
+    parser.add_argument("--ld-r2", dest="ld_fn", metavar="ld.tab",
+                        help="Tab file of LD R^2 statistics",
+                        type=str, default=None)
+    parser.add_argument("-r", "--max-r2", help="Maximum R^2 for LD filter",
+                        dest="max_r2", int=float, default=0.0)
     parser.add_argument("-g", "--gen", metavar="N", dest="ngen",
                         type=int, default=5,
                         help="Approximate number of generations between "
@@ -349,6 +390,14 @@ def main():
     biallelic_sites = numpy.array([frqs.isin(args.chrom, p, row['base'])
                                    for p, row in low_obs_df.iterrows()])
     low_obs_df = low_obs_df[biallelic_sites]
+
+    if args.ld_fn:
+        ld_df = pandas.read_csv(args.ld_fn, sep='\t', header=1,
+                                names=['chrom', 'pos1', 'pos2', 'r^2'])
+        low_obs_df = apply_ld_filter(args=args,
+                                     ld_df=ld_df,
+                                     low_obs_df=low_obs_df,
+                                     frqs=frqs)
 
     print('Observed {}/{} SNPs'.format(low_obs_df.shape[0], hi_geno_df.shape[0]))
 

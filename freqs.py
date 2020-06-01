@@ -88,6 +88,18 @@ class AlleleFreqs(object):
         """
         return _key(chrm, pos, base) in self.freqs
 
+    def min_af(self, chrm, pos):
+        """
+        Returns the minimum allele frequency at the specified position.
+        """
+        keys = [_key(chrm, pos, base) for base in 'ACGT']
+        afs = [self.freqs[key] for key in keys if key in self.freqs]
+        if not afs:
+            # No entries found, report the pseudocount
+            return 0.5 / self.total
+        return min(afs)
+
+
 def _key(chrm, pos, base):
     """
     Returns a key string based a chromosome id, position, and base char.
