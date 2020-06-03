@@ -131,14 +131,14 @@ def apply_ld_filter(args, ld_df, low_obs_df, frqs):
     Returns:
         The low coverage DataFrame after LD pruning.
     """
-    ld_low_df = ld_df[ld_df['POS1'].isin(low_obs_df.index)
-                      & ld_df['POS2'].isin(low_obs_df.index)]
+    ld_low_df = ld_df[ld_df['pos1'].isin(low_obs_df.index)
+                      & ld_df['pos2'].isin(low_obs_df.index)
+                      & ld_df['r^2'] > args.max_r2]
 
     excluded = set()
 
     for _, row in ld_low_df.sort_values(['pos2', 'pos1']).iterrows():
-        if ((row['pos1'] not in excluded and row['pos2'] not in excluded)
-                and row['r^2'] > args.max_r2):
+        if row['pos1'] not in excluded and row['pos2'] not in excluded:
             freq1 = frqs.min_af(row['chrom'], row['pos1'])
             freq2 = frqs.min_af(row['chrom'], row['pos2'])
             excluded.add(row['pos1'] if freq1 < freq2 else row['pos2'])
@@ -327,7 +327,7 @@ def main():
                         help="Tab file of LD R^2 statistics",
                         type=str, default=None)
     parser.add_argument("-r", "--max-r2", help="Maximum R^2 for LD filter",
-                        dest="max_r2", int=float, default=0.0)
+                        dest="max_r2", type=float, default=0.0)
     parser.add_argument("-g", "--gen", metavar="N", dest="ngen",
                         type=int, default=5,
                         help="Approximate number of generations between "
