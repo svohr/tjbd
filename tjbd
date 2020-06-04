@@ -133,7 +133,7 @@ def apply_ld_filter(args, ld_df, low_obs_df, frqs):
     """
     ld_low_df = ld_df[ld_df['pos1'].isin(low_obs_df.index)
                       & ld_df['pos2'].isin(low_obs_df.index)
-                      & ld_df['r^2'] > args.max_r2]
+                      & (ld_df['r^2'] > args.max_r2)]
 
     excluded = set()
 
