@@ -37,7 +37,8 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
             'size_cm': seg['size_cm'],
             'size_bp': seg['end'] - seg['start'],
             'detected': int(detected),
-            'missed': int(not detected)})
+            'missed': int(not detected),
+            'max_posterior': tjbd_pos_df.loc[seg_mask, 'posterior'].max()})
 
     for _, seg in tjbd_seg_df.iterrows():
         seg_mask = ((tjbd_pos_df['pos'] >= seg['start'])
@@ -129,7 +130,7 @@ def main():
 
     summary.to_frame().T.to_csv('{}_summary.tsv'.format(args.out_prefix),
                                 sep='\t', index=False, header=False)
-    true_cols = ['size_cm', 'size_bp', 'detected', 'missed']
+    true_cols = ['size_cm', 'size_bp', 'detected', 'missed', 'max_posterior']
     true_segments_df[true_cols].to_csv(
         '{}_true_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
     detected_cols = ['size_cm', 'size_bp', 'true_positive', 'false_positive']
