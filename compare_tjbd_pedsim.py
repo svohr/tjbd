@@ -97,7 +97,8 @@ def main():
                                                'chrom', 'start', 'end',
                                                'ibd', 'start_cm', 'end_cm',
                                                'size_cm'],
-                                        dtype={'chrom': str})
+                                        dtype={'chrom': str, 'start': int,
+                                               'end': int})
 
     chrom_summaries = []
     true_segments = []
@@ -109,8 +110,12 @@ def main():
         tjbd_seg_fn = '{}.seg.tsv'.format(args.tjbd_template.format(chrom))
         tjbd_pos_fn = '{}.pos.tsv'.format(args.tjbd_template.format(chrom))
 
-        tjbd_seg_df = pandas.read_csv(tjbd_seg_fn, sep='\t')
-        tjbd_pos_df = pandas.read_csv(tjbd_pos_fn, sep='\t')
+        tjbd_seg_df = pandas.read_csv(tjbd_seg_fn, sep='\t',
+                                      dtype={'chrom': str, 'start': int,
+                                             'end': int, 'n_snps': int,
+                                             'physical_length': int})
+        tjbd_pos_df = pandas.read_csv(tjbd_pos_fn, sep='\t',
+                                      dtype={'chrom': str, 'pos': int})
 
         summary, true_segs, detected_segs = (
             compare_chromosome(chrom=chrom,

@@ -361,7 +361,8 @@ def main():
     if args.ld_fn:
         print('Reading LD r^2 statistics...')
         ld_df = pandas.read_csv(args.ld_fn, sep='\t', header=1,
-                                names=['chrom', 'pos1', 'pos2', 'r^2'])
+                                names=['chrom', 'pos1', 'pos2', 'r^2'],
+                                dtype={'chrom': str, 'pos1': int, 'pos2': int})
         low_obs_df = apply_ld_filter(args=args,
                                      ld_df=ld_df,
                                      low_obs_df=low_obs_df,
