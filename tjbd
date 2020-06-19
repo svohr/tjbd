@@ -2,21 +2,22 @@
 '''
 tjbd detects IBD segments shared between a genome sequenced to high-coverage
 with complete genotype calls and a low-coverage genome where single base
-pair obserations are made from sparse coverage.
+pair observations are made from sparse coverage.
 '''
 
 from __future__ import print_function, division
-import sys
 import argparse
+import sys
 
 import numpy
 import pandas
 import pysam
 
-import freqs
-import recmap
-import ibd_hmm
 import confusion
+import freqs
+import ibd_hmm
+import recmap
+import results
 
 
 def make_obs_from_pileup(args, bamfile_in, obs_pos):
@@ -25,10 +26,12 @@ def make_obs_from_pileup(args, bamfile_in, obs_pos):
 
     Args:
         bamfile_in: Sequences aligned to a reference sequence.
-        chrom: Chromosome of interest.
         obs_pos: Positions of interest at which to make observations.
+
+        From args namespace:
         min_mq: Minimum mapping quality required to make a base observation.
-        min_mq: Minimum base quality required to make a base observation.
+        min_bq: Minimum base quality required to make a base observation.
+        max_cov: Maximum acceptable coverage for observed site.
     Returns:
         A pandas DataFrame containing a single base observed from each site
         in obs_pos (when possible) indexed by position.
@@ -40,17 +43,23 @@ def make_obs_from_pileup(args, bamfile_in, obs_pos):
     obs_pos_base = []
     pos_set = set(obs_pos)
     for col in pileup_iter:
-        if (col.reference_pos + 1) not in pos_set or col.nsegments != 1:
+        if ((col.reference_pos + 1) not in pos_set
+                or col.nsegments > args.max_cov):
             continue
 
         map_quals = col.get_mapping_qualities()
-        if not map_quals or map_quals[0] < args.min_mq:
-            continue
         base_quals = col.get_query_qualities()
-        if not base_quals or base_quals[0] < args.min_bq:
+        query_seqs = col.get_query_sequences()
+
+        ok_bases = [
+            base.upper()
+            for mq, bq, base in zip(map_quals, base_quals, query_seqs)
+            if mq >= args.min_mq and bq >= args.min_bq
+        ]
+        if not ok_bases:
             continue
 
-        base = col.get_query_sequences()[0].upper()
+        base = numpy.random.choice(ok_bases)
         if base in bases:
             obs_pos_base.append((col.reference_pos + 1, base))
 
@@ -81,7 +90,8 @@ def make_simulated_obs_from_vcf(args, vcf_in, obs_pos):
 
     obs_pos_base = []
 
-    obs_mask = numpy.random.poisson(args.sim_coverage, obs_pos.shape[0]) == 1
+    pos_cov = numpy.random.poisson(args.sim_coverage, obs_pos.shape[0])
+    obs_mask = (pos_cov > 0) & (pos_cov <= args.max_cov)
     obs_chrm = numpy.random.choice([0, 1], obs_pos.shape[0])
 
     obs_chrm_by_pos = {obs_pos[i]: obs_chrm[i]
@@ -101,6 +111,58 @@ def make_simulated_obs_from_vcf(args, vcf_in, obs_pos):
     low_obs_df = pandas.DataFrame(obs_pos_base, columns=['pos', 'base'])
     low_obs_df.set_index('pos', inplace=True)
     return low_obs_df
+
+
+def apply_ld_filter(args, ld_df, low_obs_df, frqs):
+    """
+    Filter low coverage observations by R-squared LD metric. LD statistics are
+    stored in a DataFrame along with the chromosome and the two positions,
+    ordered with left-most (lower) position as position 1. Pairs that do
+    not appear in the DataFrame as assumed to be unlinked. For each pair
+    of positions with low coverage observations that appear in the LD table,
+    if the R^2 value exceeds the cutoff, exclude the position with the
+    larger minor allele frequency.
+
+    Args:
+        args: namespace containing optional arguments (max_r2)
+        ld_df: pandas DataFrame containing LD statistics.
+        low_obs_df: pandas DataFrame containing single base observations,
+                    indexed by position.
+        frqs: A set of allele frequencies.
+    Returns:
+        The low coverage DataFrame after LD pruning.
+    """
+    print('Applying LD filter')
+    print('...filtering to only observed sites')
+    ld_low_df = ld_df[ld_df['pos1'].isin(low_obs_df.index)
+                      & ld_df['pos2'].isin(low_obs_df.index)
+                      & (ld_df['r^2'] > args.max_r2)]
+
+    excluded = set()
+
+    # MAF look-up
+    pos_maf = pandas.Series(low_obs_df.index,
+        index=low_obs_df.index).map(lambda p: frqs.min_af(args.chrom, p))
+
+    print('...sorting')
+    sorted_ld_low_df = ld_low_df.sort_values(['pos2', 'pos1'])
+
+    sorted_ld_low_df['pos1_maf'] = sorted_ld_low_df['pos1'].map(pos_maf)
+    sorted_ld_low_df['pos2_maf'] = sorted_ld_low_df['pos2'].map(pos_maf)
+
+    sorted_ld_low_df['to_exclude'] = numpy.where(
+        sorted_ld_low_df['pos1_maf'] < sorted_ld_low_df['pos2_maf'],
+        sorted_ld_low_df['pos2'],
+        sorted_ld_low_df['pos1']
+    )
+    print('...iterating')
+    for row in sorted_ld_low_df.itertuples():
+        if row.pos1 not in excluded and row.pos2 not in excluded:
+            excluded.add(row.to_exclude)
+
+    print('Excluded {} SNPs due to high LD'.format(len(excluded)))
+
+    return low_obs_df[~low_obs_df.index.isin(excluded)]
 
 
 def make_genotypes_for_indv_from_vcf(args, vcf_in, indv):
@@ -200,62 +262,6 @@ def run_ibd_hmm(args, hmm_inputs):
     return hmm_post_probs
 
 
-def make_results_output(args, rec_map, low_obs_df, hmm_post_probs):
-    """
-    Returns:
-        pos_results_df: a DataFrame containing the positional results from
-                        the HMM scan.
-        seg_results_df: a DataFrame containing the results summarized by
-                        segment.
-    """
-    gpos = low_obs_df.index.map(lambda x: rec_map.position(args.chrom, x))
-
-    called_ibd = ibd_hmm.find_ibd_blocks(post_probs=hmm_post_probs,
-                                         hi_score=args.max_run,
-                                         lo_score=args.min_run,
-                                         pos=gpos,
-                                         min_len=args.min_len,
-                                         merge_len=args.merge_len)
-
-    pos_results_df = pandas.DataFrame({'chrom': args.chrom,
-                                       'pos':low_obs_df.index,
-                                       'gpos':gpos,
-                                       'posterior':hmm_post_probs,
-                                       'ibd_call':called_ibd})
-
-    seg_interval_indexes = confusion.get_segment_intervals(called_ibd)
-    seg_results_df = pandas.DataFrame(seg_interval_indexes,
-                                      columns=['start_index', 'end_index'],
-                                      dtype='int')
-    seg_results_df['chrom'] = args.chrom
-
-    seg_results_df['n_snps'] = (seg_results_df['end_index']
-                                - seg_results_df['start_index'] + 1)
-
-    seg_results_df['start'] = pos_results_df.loc[seg_results_df['start_index'], 'pos'].values
-    seg_results_df['end'] = pos_results_df.loc[seg_results_df['end_index'], 'pos'].values
-    seg_results_df['physical_length'] = (seg_results_df['end']
-                                         - seg_results_df['start'])
-
-    seg_results_df['start_cm'] = pos_results_df.loc[seg_results_df['start_index'], 'gpos'].values
-    seg_results_df['end_cm'] = pos_results_df.loc[seg_results_df['end_index'], 'gpos'].values
-    seg_results_df['genetic_length'] = (seg_results_df['end_cm']
-                                        - seg_results_df['start_cm'])
-
-    seg_results_df['max_post_prob'] = 0
-    if len(seg_results_df) > 0:
-        seg_results_df['max_post_prob'] = seg_results_df.apply(
-            lambda r: hmm_post_probs[r['start_index']:r['end_index'] + 1].max(),
-            axis=1
-        )
-
-    return (pos_results_df[['chrom', 'pos', 'gpos', 'posterior', 'ibd_call']],
-            seg_results_df[['chrom', 'start', 'end',
-                            'n_snps', 'physical_length',
-                            'start_cm', 'end_cm', 'genetic_length',
-                            'max_post_prob']])
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("chrom", metavar="CHROM", type=str, default="1",
@@ -275,6 +281,14 @@ def main():
                         type=int, default=30, help="Minimum mapping quality.")
     parser.add_argument("-Q", "--base-quality", dest='min_bq', metavar="N",
                         type=int, default=30, help="Minimum base quality.")
+    parser.add_argument("-c", "--max-coverage", dest='max_cov', metavar="N",
+                        type=int, default=1,
+                        help="Exclude sites covered by more than N fragments.")
+    parser.add_argument("--ld-r2", dest="ld_fn", metavar="ld.tab",
+                        help="Tab file of LD R^2 statistics",
+                        type=str, default=None)
+    parser.add_argument("-r", "--max-r2", help="Maximum R^2 for LD filter",
+                        dest="max_r2", type=float, default=0.0)
     parser.add_argument("-g", "--gen", metavar="N", dest="ngen",
                         type=int, default=5,
                         help="Approximate number of generations between "
@@ -311,32 +325,48 @@ def main():
     if args.seed is not None:
         numpy.random.seed(args.seed)
 
+    print('Reading allele frequencies...')
     frqs = freqs.AlleleFreqs()
     with open(args.frq_fn, 'r') as frq_in:
         frqs.read_vcf_counts(frq_in)
 
+    print('Reading recombination map...')
     rec_map = recmap.RecMap()
     with open(args.rec_fn, 'r') as rec_in:
         rec_map.read_tab(rec_in)
 
+    print('Reading genotypes...')
     with pysam.VariantFile(args.vcf_fn) as vcf_in:
         hi_geno_df = make_genotypes_for_indv_from_vcf(args, vcf_in, args.indv)
 
     if args.sim_indv:
+        print('Simulating low-coverage observations...')
         sim_vcf_fn = args.sim_vcf_fn if args.sim_vcf_fn else args.vcf_fn
         with pysam.VariantFile(sim_vcf_fn) as sim_vcf_in:
             low_obs_df = make_simulated_obs_from_vcf(args,
                                                      sim_vcf_in,
                                                      hi_geno_df.index)
     else:
+        print('Reading low-coverage observations...')
         with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
             low_obs_df = make_obs_from_pileup(args, bam_in, hi_geno_df.index)
 
     # We may observe bases in the low-coverage sample that are not found in
     # the reference panel. Ignore those sites (tri-allelic, likely error).
+    print('Filtering to biallelic sites only...')
     biallelic_sites = numpy.array([frqs.isin(args.chrom, p, row['base'])
                                    for p, row in low_obs_df.iterrows()])
     low_obs_df = low_obs_df[biallelic_sites]
+
+    if args.ld_fn:
+        print('Reading LD r^2 statistics...')
+        ld_df = pandas.read_csv(args.ld_fn, sep='\t', header=1,
+                                names=['chrom', 'pos1', 'pos2', 'r^2'],
+                                dtype={'chrom': str, 'pos1': int, 'pos2': int})
+        low_obs_df = apply_ld_filter(args=args,
+                                     ld_df=ld_df,
+                                     low_obs_df=low_obs_df,
+                                     frqs=frqs)
 
     print('Observed {}/{} SNPs'.format(low_obs_df.shape[0], hi_geno_df.shape[0]))
 
@@ -348,10 +378,10 @@ def main():
 
     hmm_post_probs = run_ibd_hmm(args, hmm_inputs)
 
-    pos_results_df, seg_results_df = make_results_output(
+    pos_results_df, seg_results_df = results.make_results_output(
         args=args,
-        rec_map=rec_map,
-        low_obs_df=low_obs_df,
+        ppos=low_obs_df.index,
+        gpos=low_obs_df.index.map(lambda x: rec_map.position(args.chrom, x)),
         hmm_post_probs=hmm_post_probs)
     pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
                           index=False, sep='\t')
