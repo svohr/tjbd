@@ -12,7 +12,25 @@ from __future__ import print_function, division
 import sys
 import argparse
 
+import numpy
 import pandas
+
+
+def find_best_actual_seg_match(seg, pedsim_seg_df):
+
+    full_range = (
+        numpy.maximum(seg['end_cm'], pedsim_seg_df['end_cm'])
+        - numpy.minimum(seg['start_cm'], pedsim_seg_df['start_cm']))
+    overlap_range = (
+        numpy.minimum(seg['end_cm'], pedsim_seg_df['end_cm'])
+        - numpy.maximum(seg['start_cm'], pedsim_seg_df['start_cm']))
+
+    total_unmatched = full_range - overlap_range
+
+    if (overlap_range <= 0.0).all():
+        return None
+
+    return pedsim_seg_df.loc[total_unmatched[overlap_range > 0.0].idxmin()]
 
 
 def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=0.0):
@@ -34,6 +52,9 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
         segment_fn += not detected
 
         true_segments.append({
+            'chrom': chrom,
+            'start': seg['start'],
+            'end': seg['end'],
             'size_cm': seg['size_cm'],
             'size_bp': seg['end'] - seg['start'],
             'detected': int(detected),
@@ -48,11 +69,19 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
 
         overlaps_true = (tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].sum()
                          >= (seg_mask.sum() / 2))
+
+        best_match_seg = find_best_actual_seg_match(seg, pedsim_seg_df)
+
         detected_segments.append({
+            'chrom': chrom,
+            'start': seg['start'],
+            'end': seg['end'],
             'size_cm': seg['genetic_length'],
             'size_bp': seg['physical_length'],
             'true_positive': int(overlaps_true),
-            'false_positive': int(not overlaps_true)})
+            'false_positive': int(not overlaps_true),
+            'actual_size_cm': (
+                0.0 if best_match_seg is None else best_match_seg['size_cm'])})
 
     summary = pandas.Series()
     summary['n_segs_true'] = len(pedsim_seg_df)
@@ -135,10 +164,12 @@ def main():
 
     summary.to_frame().T.to_csv('{}_summary.tsv'.format(args.out_prefix),
                                 sep='\t', index=False, header=False)
-    true_cols = ['size_cm', 'size_bp', 'detected', 'missed', 'max_posterior']
+    true_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
+                 'detected', 'missed', 'max_posterior']
     true_segments_df[true_cols].to_csv(
         '{}_true_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
-    detected_cols = ['size_cm', 'size_bp', 'true_positive', 'false_positive']
+    detected_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
+                     'true_positive', 'false_positive', 'actual_size_cm']
     detected_segments_df[detected_cols].to_csv(
         '{}_detected_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
 
