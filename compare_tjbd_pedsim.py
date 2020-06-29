@@ -33,6 +33,13 @@ def find_best_actual_seg_match(seg, pedsim_seg_df):
     return pedsim_seg_df.loc[total_unmatched[overlap_range > 0.0].idxmin()]
 
 
+def overlaps_true_segment(seg, best_match_seg):
+    overlap_total = (
+        numpy.minimum(seg['end_cm'], best_match_seg['end_cm'])
+        - numpy.maximum(seg['start_cm'], best_match_seg['start_cm']))
+    return overlap_total > (seg['genetic_length'] / 2.0)
+
+
 def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=0.0):
     tjbd_pos_df['ibd_pedsim'] = False
 
@@ -67,10 +74,9 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
         segment_tp += tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].any()
         segment_fp += not tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].any()
 
-        overlaps_true = (tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].sum()
-                         >= (seg_mask.sum() / 2))
-
         best_match_seg = find_best_actual_seg_match(seg, pedsim_seg_df)
+
+        overlaps_true = overlaps_true_segment(seg, best_match_seg)
 
         detected_segments.append({
             'chrom': chrom,
