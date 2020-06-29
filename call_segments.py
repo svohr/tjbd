@@ -27,6 +27,10 @@ def main():
     parser.add_argument("--merge-len", dest="merge_len", type=float,
                         metavar="cM", default=0.0,
                         help="Merge IBD segments within this distance.")
+    parser.add_argument("-P", "--no-pos", dest="no_pos", type=bool,
+                        metavar="cM", default=False,
+                        help="Do not output posterior probabilities "
+                             "by position again.")
     parser.add_argument("-o", "--out-prefix", type=str, default='output',
                         help="Set prefix for the output files.")
     args = parser.parse_args()
@@ -44,8 +48,9 @@ def main():
         ppos=pos_input_df['pos'],
         gpos=pos_input_df['gpos'],
         hmm_post_probs=pos_input_df['posterior'])
-    pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
-                          index=False, sep='\t')
+    if not args.no_pos:
+        pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
+                              index=False, sep='\t')
     seg_results_df.to_csv('{}.seg.tsv'.format(args.out_prefix),
                           index=False, sep='\t')
     return 0
