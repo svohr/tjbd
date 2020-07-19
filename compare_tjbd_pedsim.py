@@ -34,6 +34,8 @@ def find_best_actual_seg_match(seg, pedsim_seg_df):
 
 
 def overlaps_true_segment(seg, best_match_seg):
+    if best_match_seg is None:
+        return False
     overlap_total = (
         numpy.minimum(seg['end_cm'], best_match_seg['end_cm'])
         - numpy.maximum(seg['start_cm'], best_match_seg['start_cm']))
