@@ -114,7 +114,7 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
     summary['pos_fn'] = (tjbd_pos_df['ibd_pedsim']
                          & ~tjbd_pos_df['ibd_call']).sum()
 
-    return summary, true_segments, detected_segments
+    return summary, true_segments, detected_segments, prob_hist_df
 
 
 def main():
@@ -140,6 +140,7 @@ def main():
     chrom_summaries = []
     true_segments = []
     detected_segments = []
+    prob_histograms = []
     for chrom in (str(c) for c in range(1, 23)):
         print(chrom, file=sys.stderr)
         pedsim_seg_df = all_pedsim_seg_df[all_pedsim_seg_df['chrom'] == chrom]
@@ -154,7 +155,7 @@ def main():
         tjbd_pos_df = pandas.read_csv(tjbd_pos_fn, sep='\t',
                                       dtype={'chrom': str, 'pos': int})
 
-        summary, true_segs, detected_segs = (
+        summary, true_segs, detected_segs, prob_hist_df = (
             compare_chromosome(chrom=chrom,
                                pedsim_seg_df=pedsim_seg_df,
                                tjbd_seg_df=tjbd_seg_df,
@@ -164,6 +165,7 @@ def main():
         chrom_summaries.append(summary)
         true_segments += true_segs
         detected_segments += detected_segs
+        prob_histograms.append(prob_hist_df)
 
     summary = pandas.DataFrame(chrom_summaries).sum()
 
@@ -180,6 +182,20 @@ def main():
                      'true_positive', 'false_positive', 'actual_size_cm']
     detected_segments_df[detected_cols].to_csv(
         '{}_detected_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
+
+    # make histogram of the posterior probabilities by true IBD state
+    bins = list(i / 1000 for i in range(1, 1001, 1))
+
+    tjbd_pos_df['posterior_bin'] = pandas.cut(tjbd_pos_df['posterior'], bins)
+
+    prob_hist_df = tjbd_pos_df.groupby(['ibd_pedsim', 'posterior_bin'])['posterior'].count().rename('count')
+
+
+    prob_hist_df = pandas.DataFrame(prob_histograms).sum().rename('count').to_frame()
+    prob_hist_df['frequency'] = (
+        prob_hist_df['count'] / prob_hist_df.groupby('ibd_pedsim')['count'].sum()
+    )
+    prob_hist_df.to_csv('{}_prob_hist.tsv'.format(args.out_prefix), sep='\t')
 
     return 0
 
