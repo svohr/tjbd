@@ -9,8 +9,8 @@ Wed Aug 21 18:31:11 PDT 2019
 '''
 from __future__ import print_function, division
 
-import sys
 import argparse
+import sys
 
 import numpy
 import pandas
@@ -114,7 +114,7 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
     summary['pos_fn'] = (tjbd_pos_df['ibd_pedsim']
                          & ~tjbd_pos_df['ibd_call']).sum()
 
-    return summary, true_segments, detected_segments, prob_hist_df
+    return summary, true_segments, detected_segments
 
 
 def main():
@@ -140,7 +140,7 @@ def main():
     chrom_summaries = []
     true_segments = []
     detected_segments = []
-    prob_histograms = []
+    post_probs = []
     for chrom in (str(c) for c in range(1, 23)):
         print(chrom, file=sys.stderr)
         pedsim_seg_df = all_pedsim_seg_df[all_pedsim_seg_df['chrom'] == chrom]
@@ -155,7 +155,7 @@ def main():
         tjbd_pos_df = pandas.read_csv(tjbd_pos_fn, sep='\t',
                                       dtype={'chrom': str, 'pos': int})
 
-        summary, true_segs, detected_segs, prob_hist_df = (
+        summary, true_segs, detected_segs = (
             compare_chromosome(chrom=chrom,
                                pedsim_seg_df=pedsim_seg_df,
                                tjbd_seg_df=tjbd_seg_df,
@@ -165,7 +165,7 @@ def main():
         chrom_summaries.append(summary)
         true_segments += true_segs
         detected_segments += detected_segs
-        prob_histograms.append(prob_hist_df)
+        post_probs.append(tjbd_pos_df)  # true IBD state added in comparison
 
     summary = pandas.DataFrame(chrom_summaries).sum()
 
@@ -184,19 +184,30 @@ def main():
         '{}_detected_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
 
     # make histogram of the posterior probabilities by true IBD state
-    bins = list(i / 1000 for i in range(1, 1001, 1))
+    bin_starts = list(i / 200. for i in range(0, 200))
+    bin_ends = list(i / 200. for i in range(1, 201))
+    bins = list(i / 200. for i in range(0, 201, 1))
 
-    tjbd_pos_df['posterior_bin'] = pandas.cut(tjbd_pos_df['posterior'], bins)
-
-    prob_hist_df = tjbd_pos_df.groupby(['ibd_pedsim', 'posterior_bin'])['posterior'].count().rename('count')
-
-
-    prob_hist_df = pandas.DataFrame(prob_histograms).sum().rename('count').to_frame()
-    prob_hist_df['frequency'] = (
-        prob_hist_df['count'] / prob_hist_df.groupby('ibd_pedsim')['count'].sum()
+    post_probs_df = pandas.concat(post_probs)
+    x = (
+        pandas.cut(post_probs_df['posterior'], bins)
     )
-    prob_hist_df.to_csv('{}_prob_hist.tsv'.format(args.out_prefix), sep='\t')
 
+    post_probs_df['posterior_bin'] = x
+    prob_hist_df = post_probs_df.groupby(
+        ['ibd_pedsim', 'posterior_bin'],
+        observed=False)['posterior'].count().rename('count').to_frame()
+    prob_hist_df = prob_hist_df.reindex(
+        [(i,c) for i in [False, True] for c in x.cat.categories],
+        fill_value=0)
+
+    prob_hist_df['bin_start'] = bin_starts * 2
+    prob_hist_df['bin_end'] = bin_ends * 2
+
+    (
+        prob_hist_df[['bin_start', 'bin_end', 'count']]
+            .to_csv('{}_prob_hist.tsv'.format(args.out_prefix), sep='\t')
+    )
     return 0
 
 
