@@ -169,17 +169,18 @@ def main():
 
     summary = pandas.DataFrame(chrom_summaries).sum()
 
-    true_segments_df = pandas.DataFrame(true_segments)
-    detected_segments_df = pandas.DataFrame(detected_segments)
+    true_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
+                 'detected', 'missed', 'max_posterior']
+    true_segments_df = pandas.DataFrame(true_segments, columns=true_cols)
+    detected_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
+                     'true_positive', 'false_positive', 'actual_size_cm']
+    detected_segments_df = pandas.DataFrame(
+        detected_segments, columns=detected_cols)
 
     summary.to_frame().T.to_csv('{}_summary.tsv'.format(args.out_prefix),
                                 sep='\t', index=False, header=False)
-    true_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
-                 'detected', 'missed', 'max_posterior']
     true_segments_df[true_cols].to_csv(
         '{}_true_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
-    detected_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
-                     'true_positive', 'false_positive', 'actual_size_cm']
     detected_segments_df[detected_cols].to_csv(
         '{}_detected_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
 
