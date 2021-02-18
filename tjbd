@@ -383,7 +383,7 @@ def main():
         gpos=low_obs_df.index.map(lambda x: rec_map.position(args.chrom, x)),
         hmm_post_probs=hmm_post_probs)
     pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
-                          index=False, sep='\t')
+                          index=False, sep='\t', float_format='%.6f')
     seg_results_df.to_csv('{}.seg.tsv'.format(args.out_prefix),
                           index=False, sep='\t')
     return 0
