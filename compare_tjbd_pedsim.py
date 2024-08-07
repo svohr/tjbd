@@ -7,7 +7,7 @@ Sam Vohr (svohr@soe.ucsc.edu)
 Wed Aug 21 18:31:11 PDT 2019
 
 '''
-from __future__ import print_function, division
+
 
 import sys
 import argparse

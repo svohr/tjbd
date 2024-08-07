@@ -47,7 +47,7 @@ def state_trans(rec, gens, chrm, positions):
 
     ibd_trs[0] = 0.99999
 
-    for i in xrange(1, len(positions)):
+    for i in range(1, len(positions)):
         gen_dist = rec.distance(chrm, positions[i - 1], positions[i])
         ibd_trs[i] = prob_no_recomb(gens, gen_dist)
 
@@ -159,7 +159,7 @@ def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     bwd_ibd_scaled[-1] = 1.0
     bwd_noibd_scaled[-1] = 1.0
 
-    for i in xrange(len(observations) - 2, -1, -1):
+    for i in range(len(observations) - 2, -1, -1):
         scale = fwd_scale[i + 1]
         bwd_ibd_scaled[i] = ((ibd_trs[i + 1]
                               * prob_obs_ibd(freqs[i + 1],
@@ -271,7 +271,7 @@ def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
     bwd_ibd[-1] = 0.0
     bwd_noibd[-1] = 0.0
 
-    for i in xrange(len(observations) - 2, -1, -1):
+    for i in range(len(observations) - 2, -1, -1):
         bwd_ibd[i] = numpy.logaddexp(ibd_stay[i + 1]
                                      + logprob_obs_ibd(freqs[i + 1],
                                                        observations[i + 1])
@@ -427,7 +427,7 @@ def main():
     i = numpy.array([0.9] * 15)
     n = numpy.array([0.9] * 15)
 
-    print forward_backward(6, o, f, i, n)
+    print(forward_backward(6, o, f, i, n))
     return 0
 
 

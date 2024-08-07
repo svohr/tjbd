@@ -5,7 +5,7 @@ with complete genotype calls and a low-coverage genome where single base
 pair obserations are made from sparse coverage.
 '''
 
-from __future__ import print_function, division
+
 import argparse
 import sys
 
@@ -94,7 +94,7 @@ def make_simulated_obs_from_vcf(args, vcf_in, obs_pos):
     obs_chrm = numpy.random.choice([0, 1], obs_pos.shape[0])
 
     obs_chrm_by_pos = {obs_pos[i]: obs_chrm[i]
-                       for i in xrange(obs_pos.shape[0]) if obs_mask[i]}
+                       for i in range(obs_pos.shape[0]) if obs_mask[i]}
 
     for rec in vcf_in.fetch(contig=args.chrom):
         geno = rec.samples[args.sim_indv]['GT']

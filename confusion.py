@@ -19,8 +19,8 @@ def get_segment_intervals(segments):
     starts[0] = segments[0]
     ends = segments & ~numpy.roll(segments, -1)
     ends[-1] = segments[-1]
-    return zip([s[0] for s in numpy.argwhere(starts)],
-               [e[0] for e in numpy.argwhere(ends)])
+    return list(zip([s[0] for s in numpy.argwhere(starts)],
+               [e[0] for e in numpy.argwhere(ends)]))
 
 
 class TrialResults(object):

@@ -27,9 +27,9 @@ def init_composites(nsamps, segsize, start_gpos):
     """
     if nsamps % 2 == 1:
         nsamps -= 1
-    compo_src = range(0, nsamps, 2)
+    compo_src = list(range(0, nsamps, 2))
     compo_off = [random.uniform(0.001, segsize - 0.001) + start_gpos
-                 for _ in xrange(nsamps / 2)]
+                 for _ in range(nsamps / 2)]
     return compo_src, compo_off
 
 

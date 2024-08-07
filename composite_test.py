@@ -6,7 +6,7 @@ with eachother, and runs a trial of the IBD detection HMM on all pairs of
 individuals.
 """
 
-from __future__ import print_function
+
 
 import sys
 import os
@@ -66,14 +66,14 @@ def generate_individuals(gpos, haps, n_indvs, segsize):
         indv_haps: matrix of individuals sharing IBD
         ibd_blocks: A dictionary storing the segments that are in IBD.
     """
-    sample = random.sample(range(len(haps[0])), n_indvs * 2)
+    sample = random.sample(list(range(len(haps[0]))), n_indvs * 2)
     indv_haps = haps[:, sample]
 
     # keep an empty vector for unrelated individuals
     no_ibd = pick_ibd_block(gpos, 0)
     no_ibd.flags.writeable = False
     ibd_blocks = collections.defaultdict(lambda: no_ibd)
-    for i in xrange(0, n_indvs * 2, 4):
+    for i in range(0, n_indvs * 2, 4):
         donor = random.choice([0, 1])
         recpt = random.choice([2, 3])
 
@@ -168,7 +168,7 @@ def get_frequencies(frqs, chrm, pos, obs):
         a numpy vector of allele frequencies
     """
     return numpy.array([frqs.frequency(chrm, p, b)
-                        for p, b in itertools.izip(pos, obs)])
+                        for p, b in zip(pos, obs)])
 
 
 def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args, results):
@@ -178,7 +178,7 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args, results):
     of all other individuals.
     """
     n_indv = indv_haps.shape[1] / 2
-    for lo_samp in xrange(0, n_indv):
+    for lo_samp in range(0, n_indv):
         # generate low-coverage.
         sub_mask, lo_obs = sample_historical(indv_haps, lo_samp,
                                              args.coverage, args.error_rate)
@@ -191,7 +191,7 @@ def run_trial(rmap, frqs, indv_haps, ibd_blocks, pos, gpos, args, results):
         ibd_trs, noibd_trs = ibd_hmm.state_trans(rmap, args.ngen,
                                                  args.chrom, sub_pos)
 
-        for hi_samp in xrange(0, n_indv):
+        for hi_samp in range(0, n_indv):
             if lo_samp == hi_samp:
                 continue
             hmm_observed = encode_observations(sub_haps, hi_samp, lo_obs)
@@ -223,8 +223,8 @@ def dump_comp(args, sub_pos, sub_gpos, hi_samp, lo_samp, sub_haps, lo_obs,
     out_df = pandas.DataFrame()
     out_df['sub_pos'] = sub_pos
     out_df['sub_gpos'] = sub_gpos
-    out_df['sub_haps'] = map(''.join, zip(sub_haps[:, (hi_samp * 2)],
-                                          sub_haps[:, (hi_samp * 2) + 1]))
+    out_df['sub_haps'] = list(map(''.join, list(zip(sub_haps[:, (hi_samp * 2)],
+                                          sub_haps[:, (hi_samp * 2) + 1]))))
     out_df['lo_obs'] = lo_obs
     out_df['hmm_observed'] = hmm_observed
     out_df['lo_freq'] = lo_freq
@@ -249,7 +249,7 @@ def write_trial_log(args):
     with open('{}/{}.log'.format(args.out_dir, args.trial_name),
               'w') as log_out:
         print(' '.join(sys.argv), file=log_out)
-        for name, value in vars(args).items():
+        for name, value in list(vars(args).items()):
             print('{}: {}'.format(name, value), file=log_out)
 
 
@@ -333,7 +333,7 @@ def main():
                                       args.max_run,
                                       args.min_len))
 
-    for _ in xrange(args.reps):
+    for _ in range(args.reps):
         indv_haps, indv_ibd = generate_individuals(gpos,
                                                    init_haps,
                                                    args.n_indv,
