@@ -9,10 +9,37 @@ Wed Aug 21 18:31:11 PDT 2019
 '''
 
 
-import sys
 import argparse
+import sys
 
+import numpy
 import pandas
+
+
+def find_best_actual_seg_match(seg, pedsim_seg_df):
+
+    full_range = (
+        numpy.maximum(seg['end_cm'], pedsim_seg_df['end_cm'])
+        - numpy.minimum(seg['start_cm'], pedsim_seg_df['start_cm']))
+    overlap_range = (
+        numpy.minimum(seg['end_cm'], pedsim_seg_df['end_cm'])
+        - numpy.maximum(seg['start_cm'], pedsim_seg_df['start_cm']))
+
+    total_unmatched = full_range - overlap_range
+
+    if (overlap_range <= 0.0).all():
+        return None
+
+    return pedsim_seg_df.loc[total_unmatched[overlap_range > 0.0].idxmin()]
+
+
+def overlaps_true_segment(seg, best_match_seg):
+    if best_match_seg is None:
+        return False
+    overlap_total = (
+        numpy.minimum(seg['end_cm'], best_match_seg['end_cm'])
+        - numpy.maximum(seg['start_cm'], best_match_seg['start_cm']))
+    return overlap_total > (seg['genetic_length'] / 2.0)
 
 
 def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=0.0):
@@ -34,10 +61,14 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
         segment_fn += not detected
 
         true_segments.append({
+            'chrom': chrom,
+            'start': seg['start'],
+            'end': seg['end'],
             'size_cm': seg['size_cm'],
             'size_bp': seg['end'] - seg['start'],
             'detected': int(detected),
-            'missed': int(not detected)})
+            'missed': int(not detected),
+            'max_posterior': tjbd_pos_df.loc[seg_mask, 'posterior'].max()})
 
     for _, seg in tjbd_seg_df.iterrows():
         seg_mask = ((tjbd_pos_df['pos'] >= seg['start'])
@@ -45,13 +76,20 @@ def compare_chromosome(chrom, pedsim_seg_df, tjbd_seg_df, tjbd_pos_df, min_size=
         segment_tp += tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].any()
         segment_fp += not tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].any()
 
-        overlaps_true = (tjbd_pos_df.loc[seg_mask, 'ibd_pedsim'].sum()
-                         >= (seg_mask.sum() / 2))
+        best_match_seg = find_best_actual_seg_match(seg, pedsim_seg_df)
+
+        overlaps_true = overlaps_true_segment(seg, best_match_seg)
+
         detected_segments.append({
+            'chrom': chrom,
+            'start': seg['start'],
+            'end': seg['end'],
             'size_cm': seg['genetic_length'],
             'size_bp': seg['physical_length'],
             'true_positive': int(overlaps_true),
-            'false_positive': int(not overlaps_true)})
+            'false_positive': int(not overlaps_true),
+            'actual_size_cm': (
+                0.0 if best_match_seg is None else best_match_seg['size_cm'])})
 
     summary = pandas.Series()
     summary['n_segs_true'] = len(pedsim_seg_df)
@@ -96,11 +134,13 @@ def main():
                                                'chrom', 'start', 'end',
                                                'ibd', 'start_cm', 'end_cm',
                                                'size_cm'],
-                                        dtype={'chrom': str})
+                                        dtype={'chrom': str, 'start': int,
+                                               'end': int})
 
     chrom_summaries = []
     true_segments = []
     detected_segments = []
+    post_probs = []
     for chrom in (str(c) for c in range(1, 23)):
         print(chrom, file=sys.stderr)
         pedsim_seg_df = all_pedsim_seg_df[all_pedsim_seg_df['chrom'] == chrom]
@@ -108,8 +148,12 @@ def main():
         tjbd_seg_fn = '{}.seg.tsv'.format(args.tjbd_template.format(chrom))
         tjbd_pos_fn = '{}.pos.tsv'.format(args.tjbd_template.format(chrom))
 
-        tjbd_seg_df = pandas.read_csv(tjbd_seg_fn, sep='\t')
-        tjbd_pos_df = pandas.read_csv(tjbd_pos_fn, sep='\t')
+        tjbd_seg_df = pandas.read_csv(tjbd_seg_fn, sep='\t',
+                                      dtype={'chrom': str, 'start': int,
+                                             'end': int, 'n_snps': int,
+                                             'physical_length': int})
+        tjbd_pos_df = pandas.read_csv(tjbd_pos_fn, sep='\t',
+                                      dtype={'chrom': str, 'pos': int})
 
         summary, true_segs, detected_segs = (
             compare_chromosome(chrom=chrom,
@@ -121,21 +165,50 @@ def main():
         chrom_summaries.append(summary)
         true_segments += true_segs
         detected_segments += detected_segs
+        post_probs.append(tjbd_pos_df)  # true IBD state added in comparison
 
     summary = pandas.DataFrame(chrom_summaries).sum()
 
-    true_segments_df = pandas.DataFrame(true_segments)
-    detected_segments_df = pandas.DataFrame(detected_segments)
+    true_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
+                 'detected', 'missed', 'max_posterior']
+    true_segments_df = pandas.DataFrame(true_segments, columns=true_cols)
+    detected_cols = ['chrom', 'start', 'end', 'size_cm', 'size_bp',
+                     'true_positive', 'false_positive', 'actual_size_cm']
+    detected_segments_df = pandas.DataFrame(
+        detected_segments, columns=detected_cols)
 
     summary.to_frame().T.to_csv('{}_summary.tsv'.format(args.out_prefix),
                                 sep='\t', index=False, header=False)
-    true_cols = ['size_cm', 'size_bp', 'detected', 'missed']
     true_segments_df[true_cols].to_csv(
         '{}_true_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
-    detected_cols = ['size_cm', 'size_bp', 'true_positive', 'false_positive']
     detected_segments_df[detected_cols].to_csv(
         '{}_detected_segs.tsv'.format(args.out_prefix), sep='\t', index=False)
 
+    # make histogram of the posterior probabilities by true IBD state
+    bin_starts = list(i / 200. for i in range(0, 200))
+    bin_ends = list(i / 200. for i in range(1, 201))
+    bins = list(i / 200. for i in range(0, 201, 1))
+
+    post_probs_df = pandas.concat(post_probs)
+    x = (
+        pandas.cut(post_probs_df['posterior'], bins)
+    )
+
+    post_probs_df['posterior_bin'] = x
+    prob_hist_df = post_probs_df.groupby(
+        ['ibd_pedsim', 'posterior_bin'],
+        observed=False)['posterior'].count().rename('count').to_frame()
+    prob_hist_df = prob_hist_df.reindex(
+        [(i,c) for i in [False, True] for c in x.cat.categories],
+        fill_value=0)
+
+    prob_hist_df['bin_start'] = bin_starts * 2
+    prob_hist_df['bin_end'] = bin_ends * 2
+
+    (
+        prob_hist_df[['bin_start', 'bin_end', 'count']]
+            .to_csv('{}_prob_hist.tsv'.format(args.out_prefix), sep='\t')
+    )
     return 0
 
 

@@ -20,12 +20,12 @@ def prob_no_recomb(gens, gdist):
     distance gdist (in centimorgans) across 'gens' generations.
 
     Args:
-        gens: Number of generations (int > 0)
+        gens: Number of generations (int > 1)
         gdist: A genetic distance in centimorgans.
     Returns:
         The probability of no recombinations occuring in 'gens' generations.
     """
-    return numpy.exp(-0.01 * gdist) ** gens
+    return numpy.exp(-0.01 * gdist) ** (gens - 1)
 
 
 def state_trans(rec, gens, chrm, positions):
@@ -54,7 +54,7 @@ def state_trans(rec, gens, chrm, positions):
     # Important: any recombination will break an IBD segment, but a
     # recombination in a no IBD segment can be in between two no IBD segments.
     # Weight noibd transitions accordingly.
-    exp_noibd_prop = (1.0 - (0.5 ** (gens - 1)))
+    exp_noibd_prop = 1.0 - (1.0 / ((2.0 ** (gens - 1) - 1)))
     noibd_trs = ibd_trs + (exp_noibd_prop * (1.0 - ibd_trs))
 
     return ibd_trs, noibd_trs
