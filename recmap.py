@@ -51,7 +51,7 @@ class RecMap(object):
 
     def read_tab(self, rec_in):
         """
-        Read physical and genetic positions in from a tab delimited file
+        Read physical and genetic positions in from a plink formatted map file
         containing markers (chromosome IDs and physical positions) and genetic
         distances (in centimorgans) and populates the internal lists for each
         chromosome. Input is assumed to be sorted by physical position.
@@ -60,9 +60,9 @@ class RecMap(object):
         Returns: nothing
         """
         for line in rec_in:
-            items = line.split('\t')
+            items = line.split(' ')
             chrm = items[0]
-            pos = int(items[1])
+            pos = int(items[3])
             gpos = float(items[2])
 
             self.scaf_ppos[chrm].append(pos)

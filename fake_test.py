@@ -99,7 +99,7 @@ def find_matches(obs_hi, obs_lo):
     Returns:
         A list of booleans indicating wheather a match was found or not.
     """
-    return [match_found(h, l) for h, l in itertools.izip(obs_hi, obs_lo)]
+    return [match_found(h, l) for h, l in zip(obs_hi, obs_lo)]
 
 
 def get_frequencies(frqs, chrm, pos, obs):
@@ -114,7 +114,7 @@ def get_frequencies(frqs, chrm, pos, obs):
         a numpy vector of allele frequencies
     """
     return numpy.array([frqs.frequency(chrm, p, b)
-                        for p, b in itertools.izip(pos, obs)])
+                        for p, b in zip(pos, obs)])
 
 
 def main():
@@ -141,7 +141,7 @@ def main():
 
     random.seed("35")
 
-    for i in xrange(1):
+    for i in range(1):
         with pysam.VariantFile(args.vcf_fn, 'r') as vcf_in:
             hi_indv, lo_indv = random.sample(vcf_in.header.samples, 2)
             pos, obs_hi, obs_lo = simulate_hmm_input(vcf_in,
@@ -155,8 +155,8 @@ def main():
 
             probs = ibd_hmm.forward_backward(ngen, obs, lo_freq, ibd_trs, noibd_trs)
             lprobs = ibd_hmm.forward_backward_log_prob(ngen, obs, lo_freq, ibd_trs, noibd_trs)
-            for p, o, f, i, n, prob, l in itertools.izip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs, lprobs):
-                print "%s_%s" % (hi_indv, lo_indv), chrom, p, ngen, o, "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l
+            for p, o, f, i, n, prob, l in zip(pos, obs, lo_freq, ibd_trs, noibd_trs, probs, lprobs):
+                print("%s_%s" % (hi_indv, lo_indv), chrom, p, ngen, o, "IBD" if ibd_segs.overlaps(p) else "no-IBD", f, i, n, prob, l)
     return 0
 
 

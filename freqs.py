@@ -4,7 +4,7 @@ freqs.py
 This file contains functions for reading allele count output from VCF tools.
 """
 
-from __future__ import print_function
+
 
 import sys
 

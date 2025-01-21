@@ -47,7 +47,7 @@ def state_trans(rec, gens, chrm, positions):
 
     ibd_trs[0] = 0.99999
 
-    for i in xrange(1, len(positions)):
+    for i in range(1, len(positions)):
         gen_dist = rec.distance(chrm, positions[i - 1], positions[i])
         ibd_trs[i] = prob_no_recomb(gens, gen_dist)
 
@@ -159,7 +159,7 @@ def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     bwd_ibd_scaled[-1] = 1.0
     bwd_noibd_scaled[-1] = 1.0
 
-    for i in xrange(len(observations) - 2, -1, -1):
+    for i in range(len(observations) - 2, -1, -1):
         scale = fwd_scale[i + 1]
         bwd_ibd_scaled[i] = ((ibd_trs[i + 1]
                               * prob_obs_ibd(freqs[i + 1],
@@ -182,115 +182,115 @@ def forward_backward(gens, observations, freqs, ibd_trs, noibd_trs):
     return fwd_ibd_scaled * bwd_ibd_scaled
 
 
-#def logprob_obs_ibd(freq, obs_match):
-#    """
-#    To avoid clutter from calls to numpy.log, wraps a call to prob_obs_ibd
-#    with log transform.
-#
-#    Args:
-#        freq: Frequency of observed base in historic population.
-#        obs_match: boolean whether historical allele matches one of the
-#                   present day alelle.
-#    Returns:
-#        The log-probability observation "obs_match" within an IBD segment.
-#    """
-#    return numpy.log(prob_obs_ibd(freq, obs_match))
-#
-#
-#def logprob_obs_noibd(freq, obs_match):
-#    """
-#    To avoid clutter from calls to numpy.log, wraps a call to prob_obs_noibd
-#    with log transform.
-#
-#    Args:
-#        freq: Frequency of observed base in historic population.
-#        obs_match: boolean whether historical allele matches one of the
-#                   present day alelle.
-#    Returns:
-#        The log-probability observation "obs_match" not in an IBD segment.
-#    """
-#    return numpy.log(prob_obs_noibd(freq, obs_match))
-#
-#
-#def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
-#    """
-#    Finds the posterior probability of the historic and present-day
-#    individuals sharing an IBD segment at each observed position using
-#    the forward-backward algorithm. This function uses log-probabilities
-#    internally rather than a scaling factor to avoid underflow.
-#
-#    Args:
-#        gens: number of generations between historic and present-day
-#              individual (int > 0)
-#        observations: Sequence of observations.
-#        freqs: Numpy vector of allele frequencies for each observed historical
-#               allele
-#        ibd_trs: Numpy vector containing probabilities of remaining in IBD
-#                 segment between the current and previous positions.
-#        noibd_trs: Numpy vector containing probabilities of remaining in no IBD
-#                   segment between the current and previous positions.
-#    Returns:
-#        A numpy vector containing the posterior probability of each position
-#        being in an IBD segment.
-#    """
-#    fwd_ibd = numpy.empty(len(observations))
-#    fwd_noibd = numpy.empty(len(observations))
-#
-#    ibd_stay = numpy.log(ibd_trs)
-#    ibd_switch = numpy.log(1.0 - ibd_trs)
-#    noibd_stay = numpy.log(noibd_trs)
-#    noibd_switch = numpy.log(1.0 - noibd_trs)
-#
-#    # forward probabilities
-#    # fill in the first, chance of starting in IBD is 1 / N_generations
-#    fwd_ibd[0] = (logprob_obs_ibd(freqs[0], observations[0])
-#                  + numpy.log(1.0 / gens))
-#    fwd_noibd[0] = (logprob_obs_noibd(freqs[0], observations[0])
-#                    + numpy.log((gens - 1.0) / gens))
-#
-#    for i, obs in enumerate(observations):
-#        if i == 0:
-#            continue
-#        fwd_ibd[i] = numpy.logaddexp(logprob_obs_ibd(freqs[i], obs)
-#                                     + fwd_ibd[i - 1]
-#                                     + ibd_stay[i],
-#                                     logprob_obs_ibd(freqs[i], obs)
-#                                     + fwd_noibd[i - 1]
-#                                     + noibd_switch[i])
-#        fwd_noibd[i] = numpy.logaddexp(logprob_obs_noibd(freqs[i], obs)
-#                                       + fwd_noibd[i - 1]
-#                                       + noibd_stay[i],
-#                                       logprob_obs_noibd(freqs[i], obs)
-#                                       + fwd_ibd[i - 1]
-#                                       + ibd_switch[i])
-#
-#    # backward probabilities
-#    bwd_ibd = numpy.empty_like(fwd_ibd)
-#    bwd_noibd = numpy.empty_like(fwd_noibd)
-#
-#    bwd_ibd[-1] = 0.0
-#    bwd_noibd[-1] = 0.0
-#
-#    for i in xrange(len(observations) - 2, -1, -1):
-#        bwd_ibd[i] = numpy.logaddexp(ibd_stay[i + 1]
-#                                     + logprob_obs_ibd(freqs[i + 1],
-#                                                       observations[i + 1])
-#                                     + bwd_ibd[i + 1],
-#                                     ibd_switch[i + 1]
-#                                     + logprob_obs_noibd(freqs[i + 1],
-#                                                         observations[i + 1])
-#                                     + bwd_noibd[i + 1])
-#        bwd_noibd[i] = numpy.logaddexp(noibd_stay[i + 1]
-#                                       + logprob_obs_noibd(freqs[i + 1],
-#                                                           observations[i + 1])
-#                                       + bwd_noibd[i + 1],
-#                                       noibd_switch[i + 1]
-#                                       + logprob_obs_ibd(freqs[i + 1],
-#                                                         observations[i + 1])
-#                                       + bwd_ibd[i + 1])
-#    post_prob = (fwd_ibd + bwd_ibd) - numpy.logaddexp(fwd_ibd[-1],
-#                                                      fwd_noibd[-1])
-#    return numpy.exp(post_prob)
+def logprob_obs_ibd(freq, obs_match):
+    """
+    To avoid clutter from calls to numpy.log, wraps a call to prob_obs_ibd
+    with log transform.
+
+    Args:
+        freq: Frequency of observed base in historic population.
+        obs_match: boolean whether historical allele matches one of the
+                   present day alelle.
+    Returns:
+        The log-probability observation "obs_match" within an IBD segment.
+    """
+    return numpy.log(prob_obs_ibd(freq, obs_match))
+
+
+def logprob_obs_noibd(freq, obs_match):
+    """
+    To avoid clutter from calls to numpy.log, wraps a call to prob_obs_noibd
+    with log transform.
+
+    Args:
+        freq: Frequency of observed base in historic population.
+        obs_match: boolean whether historical allele matches one of the
+                   present day alelle.
+    Returns:
+        The log-probability observation "obs_match" not in an IBD segment.
+    """
+    return numpy.log(prob_obs_noibd(freq, obs_match))
+
+
+def forward_backward_log_prob(gens, observations, freqs, ibd_trs, noibd_trs):
+    """
+    Finds the posterior probability of the historic and present-day
+    individuals sharing an IBD segment at each observed position using
+    the forward-backward algorithm. This function uses log-probabilities
+    internally rather than a scaling factor to avoid underflow.
+
+    Args:
+        gens: number of generations between historic and present-day
+              individual (int > 0)
+        observations: Sequence of observations.
+        freqs: Numpy vector of allele frequencies for each observed historical
+               allele
+        ibd_trs: Numpy vector containing probabilities of remaining in IBD
+                 segment between the current and previous positions.
+        noibd_trs: Numpy vector containing probabilities of remaining in no IBD
+                   segment between the current and previous positions.
+    Returns:
+        A numpy vector containing the posterior probability of each position
+        being in an IBD segment.
+    """
+    fwd_ibd = numpy.empty(len(observations))
+    fwd_noibd = numpy.empty(len(observations))
+
+    ibd_stay = numpy.log(ibd_trs)
+    ibd_switch = numpy.log(1.0 - ibd_trs)
+    noibd_stay = numpy.log(noibd_trs)
+    noibd_switch = numpy.log(1.0 - noibd_trs)
+
+    # forward probabilities
+    # fill in the first, chance of starting in IBD is 1 / N_generations
+    fwd_ibd[0] = (logprob_obs_ibd(freqs[0], observations[0])
+                  + numpy.log(1.0 / gens))
+    fwd_noibd[0] = (logprob_obs_noibd(freqs[0], observations[0])
+                    + numpy.log((gens - 1.0) / gens))
+
+    for i, obs in enumerate(observations):
+        if i == 0:
+            continue
+        fwd_ibd[i] = numpy.logaddexp(logprob_obs_ibd(freqs[i], obs)
+                                     + fwd_ibd[i - 1]
+                                     + ibd_stay[i],
+                                     logprob_obs_ibd(freqs[i], obs)
+                                     + fwd_noibd[i - 1]
+                                     + noibd_switch[i])
+        fwd_noibd[i] = numpy.logaddexp(logprob_obs_noibd(freqs[i], obs)
+                                       + fwd_noibd[i - 1]
+                                       + noibd_stay[i],
+                                       logprob_obs_noibd(freqs[i], obs)
+                                       + fwd_ibd[i - 1]
+                                       + ibd_switch[i])
+
+    # backward probabilities
+    bwd_ibd = numpy.empty_like(fwd_ibd)
+    bwd_noibd = numpy.empty_like(fwd_noibd)
+
+    bwd_ibd[-1] = 0.0
+    bwd_noibd[-1] = 0.0
+
+    for i in range(len(observations) - 2, -1, -1):
+        bwd_ibd[i] = numpy.logaddexp(ibd_stay[i + 1]
+                                     + logprob_obs_ibd(freqs[i + 1],
+                                                       observations[i + 1])
+                                     + bwd_ibd[i + 1],
+                                     ibd_switch[i + 1]
+                                     + logprob_obs_noibd(freqs[i + 1],
+                                                         observations[i + 1])
+                                     + bwd_noibd[i + 1])
+        bwd_noibd[i] = numpy.logaddexp(noibd_stay[i + 1]
+                                       + logprob_obs_noibd(freqs[i + 1],
+                                                           observations[i + 1])
+                                       + bwd_noibd[i + 1],
+                                       noibd_switch[i + 1]
+                                       + logprob_obs_ibd(freqs[i + 1],
+                                                         observations[i + 1])
+                                       + bwd_ibd[i + 1])
+    post_prob = (fwd_ibd + bwd_ibd) - numpy.logaddexp(fwd_ibd[-1],
+                                                      fwd_noibd[-1])
+    return numpy.exp(post_prob)
 
 
 def find_ibd_blocks_basic(post_probs, hi_score, lo_score):
@@ -427,7 +427,7 @@ def main():
     i = numpy.array([0.9] * 15)
     n = numpy.array([0.9] * 15)
 
-    print forward_backward(6, o, f, i, n)
+    print(forward_backward(6, o, f, i, n))
     return 0
 
 
