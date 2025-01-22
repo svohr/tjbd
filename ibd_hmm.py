@@ -28,7 +28,7 @@ def prob_no_recomb(gens, gdist):
     return numpy.exp(-0.01 * gdist) ** (gens - 1)
 
 
-def state_trans(rec, gens, chrm, positions):
+def get_state_transitions(positions, genetic_positions, gens):
     """
     Takes RecMap object, a number of generations, a chromosome ID and a list
     of positions and returns two vectors that contain the transition
@@ -43,13 +43,9 @@ def state_trans(rec, gens, chrm, positions):
         numpy vectors containing transition probabilities of remaining IBD
         and remaining in a no-IBD segment.
     """
-    ibd_trs = numpy.empty(len(positions))
-
+    gen_dist = genetic_positions - np.roll(genetic_positions, 1)
+    ibd_trs = prob_no_recomb(gens, gen_dist)
     ibd_trs[0] = 0.99999
-
-    for i in range(1, len(positions)):
-        gen_dist = rec.distance(chrm, positions[i - 1], positions[i])
-        ibd_trs[i] = prob_no_recomb(gens, gen_dist)
 
     # Important: any recombination will break an IBD segment, but a
     # recombination in a no IBD segment can be in between two no IBD segments.
