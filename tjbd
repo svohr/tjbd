@@ -21,7 +21,7 @@ import results
 def read_plink_map(gmap_fn, chrom):
     try:
         gmap_df = (
-            pd.read_csv(
+            pandas.read_csv(
                 gmap_fn,
                 sep=' ',
                 names=["chromosome", "id", "genetic_position", "physical_position"],
@@ -36,7 +36,7 @@ def read_plink_map(gmap_fn, chrom):
 
     diffs = (
         gmap_df["genetic_position"]
-        - np.roll(gmap_df["genetic_position"], 1)
+        - numpy.roll(gmap_df["genetic_position"], 1)
     )[1:]
     if (diffs < 0).any():
         raise ValueError("Genetic positions are not monotonically increasing.")
@@ -205,10 +205,10 @@ def add_genetic_positions(low_obs_df, gmap_df):
         Returns:
             The modified DataFrame
     """
-    low_obs_df["gpos"] = np.interp(
+    low_obs_df["genetic_position"] = numpy.interp(
         low_obs_df.index,
-        gmap["physical_position"],
-        gmap["genetic_position"],
+        gmap_df["physical_position"],
+        gmap_df["genetic_position"],
     )
 
     return low_obs_df.drop_duplicates("genetic_position")
