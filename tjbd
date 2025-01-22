@@ -428,7 +428,7 @@ def main():
     pos_results_df, seg_results_df = results.make_results_output(
         args=args,
         ppos=low_obs_df.index,
-        gpos=low_obs_df["genetic_position"],
+        gpos=low_obs_df.index.map(low_obs_df["genetic_position"]),
         hmm_post_probs=hmm_post_probs)
     pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
                           index=False, sep='\t', float_format='%.6f')

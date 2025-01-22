@@ -43,7 +43,7 @@ def get_state_transitions(positions, genetic_positions, gens):
         numpy vectors containing transition probabilities of remaining IBD
         and remaining in a no-IBD segment.
     """
-    gen_dist = genetic_positions - numpy.roll(genetic_positions, 1)
+    gen_dist = numpy.array(genetic_positions - numpy.roll(genetic_positions, 1))
     ibd_trs = prob_no_recomb(gens, gen_dist)
     ibd_trs[0] = 0.99999
 
