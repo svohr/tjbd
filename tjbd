@@ -242,7 +242,11 @@ def make_genotypes_for_indv_from_vcf(args, vcf_in, indv):
         pos.append(rec.pos)
         genotypes.append(tuple(rec.alleles[g] for g in geno))
 
-    hi_geno_df = pandas.DataFrame({'pos': pos, 'genotype':genotypes})
+    hi_geno_df = (
+        pandas.DataFrame(
+            {'pos': pos, 'genotype':genotypes}
+        ).drop_duplicates('pos', keep=False)
+    )
     hi_geno_df.set_index('pos', inplace=True)
     return hi_geno_df
 
