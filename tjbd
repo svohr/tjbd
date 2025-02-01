@@ -90,7 +90,14 @@ def make_obs_from_bam(args, obs_pos):
             if base in bases:
                 obs_pos_base.append((col.reference_pos + 1, base))
 
-    low_obs_df = pandas.DataFrame(obs_pos_base, columns=['pos', 'base'])
+    # Some VCFs may contain multiple entries for the same position, but we
+    # require positions to be unique.
+    low_obs_df = (
+        pandas.DataFrame(
+            obs_pos_base,
+            columns=['pos', 'base']
+        ).drop_duplicates('pos', keep=False)
+    )
     low_obs_df.set_index('pos', inplace=True)
     return low_obs_df
 
