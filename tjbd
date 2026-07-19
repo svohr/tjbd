@@ -15,19 +15,46 @@ import pysam
 
 import freqs
 import ibd_hmm
-import recmap
 import results
 
 
-def make_obs_from_pileup(args, bamfile_in, obs_pos):
+def read_plink_map(gmap_fn, chrom):
+    try:
+        gmap_df = (
+            pandas.read_csv(
+                gmap_fn,
+                sep=' ',
+                names=["chromosome", "id", "genetic_position", "physical_position"],
+            )
+            .set_index("chromosome")
+            .loc[chrom]
+            .reset_index()
+            .sort_values("physical_position")
+        )
+    except KeyError as e:
+        raise KeyError(f"Chromosome/scaffold '{chrom}' not found in genetic map.")
+
+    diffs = (
+        gmap_df["genetic_position"]
+        - numpy.roll(gmap_df["genetic_position"], 1)
+    )[1:]
+    if (diffs < 0).any():
+        raise ValueError("Genetic positions are not monotonically increasing.")
+
+    return gmap_df
+
+
+def make_obs_from_bam(args, obs_pos):
     '''
-    Make a DataFrame of observed bases from pileup format input.
+    Make a DataFrame of observed bases from a bam file for the specific
+    positions.
 
     Args:
-        bamfile_in: Sequences aligned to a reference sequence.
         obs_pos: Positions of interest at which to make observations.
 
         From args namespace:
+        bam_fn: Path to bam file of aligned sequences.
+        chrom: Chromosome
         min_mq: Minimum mapping quality required to make a base observation.
         min_bq: Minimum base quality required to make a base observation.
         max_cov: Maximum acceptable coverage for observed site.
@@ -36,33 +63,41 @@ def make_obs_from_pileup(args, bamfile_in, obs_pos):
         in obs_pos (when possible) indexed by position.
     '''
     bases = set('ACGT')
-    # pileup coords are 1-based, but these are 0-based.
-    pileup_iter = bamfile_in.pileup(args.chrom)
+    with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
+        # pileup coords are 1-based, but these are 0-based.
+        pileup_iter = bam_in.pileup(args.chrom)
 
-    obs_pos_base = []
-    pos_set = set(obs_pos)
-    for col in pileup_iter:
-        if ((col.reference_pos + 1) not in pos_set
-                or col.nsegments > args.max_cov):
-            continue
+        obs_pos_base = []
+        pos_set = set(obs_pos)
+        for col in pileup_iter:
+            if ((col.reference_pos + 1) not in pos_set
+                    or col.nsegments > args.max_cov):
+                continue
 
-        map_quals = col.get_mapping_qualities()
-        base_quals = col.get_query_qualities()
-        query_seqs = col.get_query_sequences()
+            map_quals = col.get_mapping_qualities()
+            base_quals = col.get_query_qualities()
+            query_seqs = col.get_query_sequences()
 
-        ok_bases = [
-            base.upper()
-            for mq, bq, base in zip(map_quals, base_quals, query_seqs)
-            if mq >= args.min_mq and bq >= args.min_bq
-        ]
-        if not ok_bases:
-            continue
+            ok_bases = [
+                base.upper()
+                for mq, bq, base in zip(map_quals, base_quals, query_seqs)
+                if mq >= args.min_mq and bq >= args.min_bq
+            ]
+            if not ok_bases:
+                continue
 
-        base = numpy.random.choice(ok_bases)
-        if base in bases:
-            obs_pos_base.append((col.reference_pos + 1, base))
+            base = numpy.random.choice(ok_bases)
+            if base in bases:
+                obs_pos_base.append((col.reference_pos + 1, base))
 
-    low_obs_df = pandas.DataFrame(obs_pos_base, columns=['pos', 'base'])
+    # Some VCFs may contain multiple entries for the same position, but we
+    # require positions to be unique.
+    low_obs_df = (
+        pandas.DataFrame(
+            obs_pos_base,
+            columns=['pos', 'base']
+        ).drop_duplicates('pos', keep=False)
+    )
     low_obs_df.set_index('pos', inplace=True)
     return low_obs_df
 
@@ -164,6 +199,28 @@ def apply_ld_filter(args, ld_df, low_obs_df, frqs):
     return low_obs_df[~low_obs_df.index.isin(excluded)]
 
 
+def add_genetic_positions(low_obs_df, gmap_df):
+    """
+        Add a column for genetic position to the low-coverage observation
+        DataFrame using the supplied genetic map and linear interpolation on
+        the observed physical positions. Remove sites with duplicate genetic
+        positions, keeping the first appearance.
+
+        Args:
+            low_obs_df: a DataFrame containing a "physical_position" column.
+            gmap_df: a DataFrame mapping "physical_position" to "genetic_position"
+        Returns:
+            The modified DataFrame
+    """
+    low_obs_df["genetic_position"] = numpy.interp(
+        low_obs_df.index,
+        gmap_df["physical_position"],
+        gmap_df["genetic_position"],
+    )
+
+    return low_obs_df.drop_duplicates("genetic_position")
+
+
 def make_genotypes_for_indv_from_vcf(args, vcf_in, indv):
     """
     Makes a DataFrame of genotypes for a single individual from a VCF file.
@@ -185,12 +242,16 @@ def make_genotypes_for_indv_from_vcf(args, vcf_in, indv):
         pos.append(rec.pos)
         genotypes.append(tuple(rec.alleles[g] for g in geno))
 
-    hi_geno_df = pandas.DataFrame({'pos': pos, 'genotype':genotypes})
+    hi_geno_df = (
+        pandas.DataFrame(
+            {'pos': pos, 'genotype':genotypes}
+        ).drop_duplicates('pos', keep=False)
+    )
     hi_geno_df.set_index('pos', inplace=True)
     return hi_geno_df
 
 
-def encode_hmm_input(args, low_obs_df, hi_geno_df, rec_map, frqs):
+def encode_hmm_input(args, low_obs_df, hi_geno_df, frqs):
     """
     Makes the input for the IBD HMM.
 
@@ -200,7 +261,6 @@ def encode_hmm_input(args, low_obs_df, hi_geno_df, rec_map, frqs):
                     historical individual indexed by position.
         hi_geno_df: DataFrame of genotypes from high coverage, modern
                     individual indexed by position.
-        rec_map: A recombination map.
         frqs: A set of allele frequencies.
     Returns:
         hmm_observed: Number of matches with the historical base found in the
@@ -218,10 +278,11 @@ def encode_hmm_input(args, low_obs_df, hi_geno_df, rec_map, frqs):
     hmm_low_freqs = numpy.array([frqs.frequency(args.chrom, p, row['base'])
                                  for p, row in low_obs_df.iterrows()])
 
-    hmm_trs_probs = ibd_hmm.state_trans(rec=rec_map,
-                                        gens=args.ngen,
-                                        chrm=args.chrom,
-                                        positions=low_obs_df.index)
+    hmm_trs_probs = ibd_hmm.get_state_transitions(
+        low_obs_df.index,
+        low_obs_df["genetic_position"],
+        gens=args.ngen,
+    )
     return hmm_observed, hmm_trs_probs, hmm_low_freqs
 
 
@@ -272,8 +333,8 @@ def main():
                         help="VCF file containing modern individual(s).")
     parser.add_argument("frq_fn", metavar="frqs.count", type=str,
                         help="Allele counts by SNP site")
-    parser.add_argument("rec_fn", metavar="recmap.tab", type=str,
-                        help="Genetic distances in tab file.")
+    parser.add_argument("gmap_fn", metavar="genetic_map.map", type=str,
+                        help="Genetic map in Plink format.")
     parser.add_argument("-i", "--indv", metavar="ID",
                         help="Individual in VCF to test.")
     parser.add_argument("-q", "--map-quality", dest='min_mq', metavar="N",
@@ -329,10 +390,8 @@ def main():
     with open(args.frq_fn, 'r') as frq_in:
         frqs.read_vcf_counts(frq_in)
 
-    print('Reading recombination map...')
-    rec_map = recmap.RecMap()
-    with open(args.rec_fn, 'r') as rec_in:
-        rec_map.read_tab(rec_in)
+    print('Reading genetic map...')
+    gmap_df = read_plink_map(args.gmap_fn, args.chrom)
 
     print('Reading genotypes...')
     with pysam.VariantFile(args.vcf_fn) as vcf_in:
@@ -347,8 +406,7 @@ def main():
                                                      hi_geno_df.index)
     else:
         print('Reading low-coverage observations...')
-        with pysam.AlignmentFile(args.bam_fn, 'r') as bam_in:
-            low_obs_df = make_obs_from_pileup(args, bam_in, hi_geno_df.index)
+        low_obs_df = make_obs_from_bam(args, hi_geno_df.index)
 
     # We may observe bases in the low-coverage sample that are not found in
     # the reference panel. Ignore those sites (tri-allelic, likely error).
@@ -367,12 +425,13 @@ def main():
                                      low_obs_df=low_obs_df,
                                      frqs=frqs)
 
+    low_obs_df = add_genetic_positions(low_obs_df, gmap_df)
+
     print('Observed {}/{} SNPs'.format(low_obs_df.shape[0], hi_geno_df.shape[0]))
 
     hmm_inputs = encode_hmm_input(args=args,
                                   low_obs_df=low_obs_df,
                                   hi_geno_df=hi_geno_df,
-                                  rec_map=rec_map,
                                   frqs=frqs)
 
     hmm_post_probs = run_ibd_hmm(args, hmm_inputs)
@@ -380,7 +439,7 @@ def main():
     pos_results_df, seg_results_df = results.make_results_output(
         args=args,
         ppos=low_obs_df.index,
-        gpos=low_obs_df.index.map(lambda x: rec_map.position(args.chrom, x)),
+        gpos=low_obs_df.index.map(low_obs_df["genetic_position"]),
         hmm_post_probs=hmm_post_probs)
     pos_results_df.to_csv('{}.pos.tsv'.format(args.out_prefix),
                           index=False, sep='\t', float_format='%.6f')
