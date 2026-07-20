@@ -1,4 +1,4 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 """
 This script takes in a VCF file containing the genotypes of N individuals
 individuals and generates N composite _haplotypes_ (N/2 diploid individuals) to

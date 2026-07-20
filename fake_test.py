@@ -1,4 +1,4 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 """
 This script simulates low-coverage obsevations of a historic individual
 including segments of IBD shared with a high-coverage present day individual
