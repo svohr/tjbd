@@ -12,7 +12,6 @@ Writes 2 files:
 "Rel_branch_summaries.tsv" - IBD summaries by level
 "Rel_branch_merged_segments.tsv" - IBD segments merged by level
 """
-import re
 
 import pandas as pd
 

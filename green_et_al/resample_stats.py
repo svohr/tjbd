@@ -290,13 +290,13 @@ def main(rel_branches_csv, params_csv, scan_tsvs, n_samples, out_prefix):
             & (scans_df["threshold"] == threshold)
         ]
 
-        stats = []
+        stats_rows = []
         for i in range(n_samples):
 
             merged_df = resample_branch(model_scans_df, branch_new_ids)
-            stats.append(calc_stats(param_df, merged_df, branch, threshold))
+            stats_rows.append(calc_stats(param_df, merged_df, branch, threshold))
 
-        stats_df = pd.DataFrame(stats)
+        stats_df = pd.DataFrame(stats_rows)
 
         stats_df.to_csv(f"{prefix}_samples.csv", index=False)
         summary_df = stats_df.describe(percentiles=[0.025, 0.50, 0.975]).drop(columns="threshold")
