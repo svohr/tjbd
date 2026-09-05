@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["tjbd*"]
+exclude = ["tests*"]
+
+[project]
+name = "tjbd"
+version = "0.1.0"
+authors = [
+  { name="Samuel H. Vohr", email="svohr@soe.ucsc.edu" },
+]
+description = "Identity-by-descent detection between low-coverage sequences and high-coverage genomes."
+license = "MIT"
+license-files = ["LICENSE"]
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = ["bioinformatics", "identity by descent", "ancient DNA"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pysam",
+    "numpy",
+    "scipy",
+    "pandas",
+    "pytest",
+]
+
+[project.urls]
+Homepage = "https://github.com/svohr/tjbd"
