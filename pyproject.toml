@@ -33,3 +33,6 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/svohr/tjbd"
+
+[project.scripts]
+tjbd = "tjbd.tjbd:main"
