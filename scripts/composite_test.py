@@ -18,10 +18,7 @@ import collections
 import numpy
 import pandas
 
-import recmap
-import freqs
-import ibd_hmm
-import confusion
+from tjbd import confusion, freqs, ibd_hmm, recmap
 
 
 def read_composites(cmp_in):

@@ -7,7 +7,7 @@ import sys
 
 import pandas
 
-import results
+from tjbd import results
 
 
 def main():

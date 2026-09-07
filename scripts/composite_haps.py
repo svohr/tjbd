@@ -10,7 +10,7 @@ import argparse
 import random
 import pysam
 
-import recmap
+from tjbd import recmap
 
 
 def init_composites(nsamps, segsize, start_gpos):
