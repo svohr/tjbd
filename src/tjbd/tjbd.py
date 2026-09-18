@@ -13,9 +13,7 @@ import numpy
 import pandas
 import pysam
 
-import freqs
-import ibd_hmm
-import results
+from tjbd import freqs, ibd_hmm, results
 
 
 def read_plink_map(gmap_fn, chrom):

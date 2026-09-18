@@ -4,8 +4,6 @@ freqs.py
 This file contains functions for reading allele count output from VCF tools.
 """
 
-
-
 import sys
 
 

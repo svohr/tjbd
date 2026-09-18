@@ -1,46 +1,23 @@
-# tjbd
+# TJBD
 
 ## Overview
-This repository contains scripts for inferring Identity By Descent (IBD)
-segments between a high-coverage genome from a present-day individual and
-low-coverage shotgun sequencing data from a recent ancestor (<10 generations
-removed).
+TJBD is a tool for detecting Identity By Descent (IBD) segments shared between
+a high-coverage genome and low-coverage shotgun sequencing data. In most cases,
+the low-coverage sequences will be derived from an ancient or historical DNA
+sample.
 
-## Hidden Markov Model
+## Installation
 
+To install TJBD, clone this repository, and install via `pip`.
 ```
-                    +--------+       1-(1-D)^g        +--------+
-Hidden         +----+        |----------------------->|        +----+
-       (1-D)^g |    |  TJBD  |                        | NoTJBD |    | (1-D)^g
-               +--->|        |<-----------------------|        |<---+
-                    +-+--+-+-+       1-(1-D)^g        +-+----+-+
-                      |   \ \                                |
-                      |    \ \     f_tj/2                    |
-                      |     \ +-------------------------+    |
-           (1+f_tj)/2 |      \                          |    | f_tj
-                      |       \ (1+2f_tj)/4             |    |
-                      |        +------+                 |    |
-                      |   +-----------|-----+-----------|----+
-                      v   v           v     v           v    v
-                   +---------+      +---------+       +---------+
-Observed           |         |      |         |       |         |
-                   | match 2 |      | match 1 |       | match 0 |
-                   |         |      |         |       |         |
-                   +---------+      +---------+       +---------+
-
-f_tj = Frequency of observed historical base in population
-   D = Probability of recombination per generation (genetic distance in Morgans)
-   g = Number of generations between historical and present-day individuals
+cd tjbd
+pip install .
 ```
+The `tjbd` command will be available in your environment.
 
-## Inputs
-1. A bam file containing reads mapped to the reference human genome from
-   the low-coverage sequencing of the historical individual.
-2. A VCF file containing genotypes of the present-day descendant.
-3. Population allele frequencies or counts (e.g., 1000 Genomes Project data)
-4. A genetic/recombination map
+## Usage
 
-## Output
-The posterior probablilities of the two individuals sharing at least one
-chromosome segment of IBD and not IBD at each observed position.
+### Required Arguments
+
+### Options
 

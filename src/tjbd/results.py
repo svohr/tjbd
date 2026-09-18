@@ -1,8 +1,7 @@
 
 import pandas
 
-import confusion
-import ibd_hmm
+from tjbd import confusion, ibd_hmm
 
 
 def make_results_output(args, ppos, gpos, hmm_post_probs):
